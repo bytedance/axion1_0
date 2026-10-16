@@ -29,6 +29,8 @@ Thumbs.db
 .venv/
 venv/
 .env
+# eval/README.md installs the HiPhO grader's dependencies into this prefix
+eval/.hipho_deps/
 
 # Data, checkpoints and run output.
 # These are anchored with a leading slash on purpose: an unanchored "data/"

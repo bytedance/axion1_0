@@ -88,6 +88,31 @@ ROLLOUT_TEST_FREQ="${ROLLOUT_TEST_FREQ:-0}"
 STOP_AFTER_N_STEPS="${STOP_AFTER_N_STEPS:-$TARGET_TRAIN_STEPS}"
 
 set +a
+
+# Check the parallelism the recipe just set, here rather than inside Megatron:
+# a violation otherwise surfaces as an assertion deep in the trainer, after the
+# weights have finished loading. `return` keeps a failure from closing the shell
+# this file was sourced into.
+_trainer_world=$(( TRAINER_NNODES * TRAINER_NGPUS_PER_NODE ))
+_model_parallel=$(( MEGATRON_TP * MEGATRON_PP * MEGATRON_CP ))
+if (( _model_parallel <= 0 || _trainer_world % _model_parallel != 0 )); then
+  echo "[ERROR] trainer world ${_trainer_world} (${TRAINER_NNODES} nodes x" \
+       "${TRAINER_NGPUS_PER_NODE} GPUs) is not divisible by TP(${MEGATRON_TP}) x" \
+       "PP(${MEGATRON_PP}) x CP(${MEGATRON_CP}) = ${_model_parallel}." >&2
+  return 1 2>/dev/null || exit 1
+fi
+_dp=$(( _trainer_world / _model_parallel ))
+_expert_slots=$(( _dp * MEGATRON_TP ))
+_expert_parallel=$(( MEGATRON_EP * MEGATRON_ETP ))
+if (( _expert_parallel <= 0 || _expert_slots % _expert_parallel != 0 )); then
+  echo "[ERROR] MoE parallelism invalid: DP(${_dp}) x TP(${MEGATRON_TP}) =" \
+       "${_expert_slots} is not divisible by EP(${MEGATRON_EP}) x" \
+       "ETP(${MEGATRON_ETP}) = ${_expert_parallel}. Adjust MEGATRON_EP/MEGATRON_ETP." >&2
+  return 1 2>/dev/null || exit 1
+fi
+echo "[rl_35b] parallelism ok: trainer_world=${_trainer_world} TP=${MEGATRON_TP}" \
+     "PP=${MEGATRON_PP} CP=${MEGATRON_CP} DP=${_dp} EP=${MEGATRON_EP} ETP=${MEGATRON_ETP}"
+
 echo "[rl_35b] topology ${ROLLOUT_NNODES}+${TRAINER_NNODES} nodes;" \
      "rollout TP${ROLLOUT_TENSOR_PARALLEL_SIZE};" \
      "trainer TP${MEGATRON_TP} PP${MEGATRON_PP} EP${MEGATRON_EP};" \

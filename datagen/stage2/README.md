@@ -35,19 +35,25 @@ each:
 
 ### `gen_single_row.py` — one database, pick a row by a property
 
-> Consider all elliptic curves over Q of conductor 3420, up to isomorphism
-> over Q. Take the one whose minimal discriminant has the largest absolute
-> value. For that curve, what is the trace of Frobenius a_p at p = 1123?
+> Consider all confirmed exoplanets in systems with exactly 6 known planets.
+> Among them, take the one with the largest orbital semi-major axis. For that
+> planet, determine its mean density in g/cm^3, computed from its mass and
+> radius. Use M_Earth = 5.9722e24 kg; R_Earth = 6371 km. Give the numerical
+> value to three significant figures.
 
-Find the right table, single out one row, compute. The generator checks its
-own arithmetic against reference values shipped with the database.
+Find the right table, single out one row, compute. The pool constraint, the
+field the row is singled out by, and the derived quantity are each drawn at
+random, so one database yields many shapes of question. Where the catalogue
+also tabulates the derived quantity, the generator checks its own arithmetic
+against that column and discards the item on a mismatch.
 
 ```bash
-git clone https://github.com/JohnCremona/ecdata ./data/ecdata
-python generators/gen_single_row.py --data ./data/ecdata/allcurves --n 60 --out ec.jsonl
+python generators/gen_single_row.py --n 60 --out exo.jsonl --cache ./data/pscomppars.csv
 ```
 
-> Cremona elliptic curve tables · Artistic-2.0 · one clone, then fully offline
+The table is downloaded on first run; `--cache` keeps it for later runs.
+
+> NASA Exoplanet Archive · US public domain · one download, then fully offline
 
 ### `gen_ranked_list.py` — one database, build a list and rank it
 
@@ -154,13 +160,17 @@ margin that differs between frameworks.
 ## Output format
 
 ```json
-{"id": "ec-694bce86", "walk": "EC",
- "question": "Consider all elliptic curves over Q of conductor 3420 ... a_p for p = 1123?",
- "ground_truth": "-40", "answer_type": "exactMatch", "tolerance": null,
+{"id": "exo-bf6422b2", "walk": "EXO",
+ "question": "Consider all confirmed exoplanets in systems with exactly 6 known planets ...",
+ "ground_truth": "0.264 g/cm^3", "answer_type": "numeric", "tolerance": 0.02,
  "tree": {"id": "root", "type": "sequential", "children": [
-    {"id": "identify", "critical": false, "expected": "3420c4", "desc": "Cremona 3420c4"},
-    {"id": "compute",  "critical": true,  "expected": -40,       "desc": "ap {'p': 1123}"}]},
- "meta": {"N": 3420, "identify_by": "disc", "derive": "ap"}}
+    {"id": "identify", "critical": false, "expected": "HD 34445 g",
+     "desc": "Identify the planet: largest orbital semi-major axis in the pool"},
+    {"id": "params",   "critical": false, "expected": {"pl_bmasse": 120.6, "pl_rade": 13.6},
+     "desc": "Retrieve the required parameters"},
+    {"id": "final",    "critical": true,  "expected": "0.264", "desc": "density value"}]},
+ "meta": {"planet": "HD 34445 g", "id_field": "pl_orbsmax", "direction": "largest",
+          "deriv": "density"}}
 ```
 
 `answer_type` is `exactMatch` or `numeric` (the latter needs `tolerance`).

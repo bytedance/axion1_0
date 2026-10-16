@@ -89,7 +89,15 @@ PY
     && ok "dataset_info.json parses" || bad "dataset_info.json parses"
 fi
 
-echo "== 7. lint"
+echo "== 7. documented commands match their CLIs"
+if out=$( cd "$HERE/.." && python3 train/check_readme_commands.py 2>&1 ); then
+  ok "$(echo "$out" | tail -1)"
+else
+  echo "$out" | sed 's/^/  /'
+  bad "README commands do not match the scripts"
+fi
+
+echo "== 8. lint"
 if command -v ruff >/dev/null 2>&1; then
   ( cd "$HERE/.." && ruff check . >/dev/null 2>&1 ) \
     && ok "ruff check" || bad "ruff check (run: ruff check .)"
@@ -97,17 +105,21 @@ else
   echo "  skip  ruff is not installed"
 fi
 
-echo "== 8. sandbox runs code"
+echo "== 9. sandbox runs code"
 srv="$DR/tools/local_sandbox_server.py"
 if [ ! -e "$srv" ]; then bad "local_sandbox_server.py missing"; else
   python3 "$srv" --port "$PORT" --workers 4 >/tmp/smoke_sandbox.log 2>&1 &
   pid=$!
+  # --noproxy: the sandbox is on the loopback interface, but a machine with
+  # http_proxy or ALL_PROXY set sends even 127.0.0.1 through the proxy, which
+  # answers with an empty body and exit status 0 -- every check below then
+  # fails on a machine whose sandbox is in fact fine.
   for _ in $(seq 1 20); do
-    curl -s -f --max-time 2 "http://127.0.0.1:$PORT/health" >/dev/null 2>&1 && break
+    curl -s -f --noproxy '*' --max-time 2 "http://127.0.0.1:$PORT/health" >/dev/null 2>&1 && break
     sleep 1
   done
   run() {   # run() <code> -> "<status> <run_status> <stdout>"
-    curl -s --max-time 40 -X POST "http://127.0.0.1:$PORT/run_code" \
+    curl -s --noproxy '*' --max-time 40 -X POST "http://127.0.0.1:$PORT/run_code" \
       -H 'Content-Type: application/json' \
       -d "$(python3 -c 'import json,sys; print(json.dumps({"code":sys.argv[1],"language":"python","run_timeout":8.0,"compile_timeout":10,"stdin":None,"files":{},"fetch_files":[]}))' "$1")" \
       | python3 -c 'import json,sys

@@ -75,8 +75,22 @@ hosts rollout workers; it writes its endpoint into
 
 ```bash
 cd train/verl
+export SANDBOX_RO_ROOT=/data,/models     # remounted read-only inside the sandbox
 bash recipe/deepresearch/tools/start_local_sandbox.sh
 bash recipe/deepresearch/tools/verify_sandbox.sh      # optional check
+```
+
+`SANDBOX_RO_ROOT` lists the shared-storage mounts to remount read-only for
+executed code; the script refuses to start without it. Set
+`SANDBOX_PORT`, `SANDBOX_WORKERS` or `SANDBOX_PYTHON` to override the port
+(9000), the concurrency (64) or the interpreter.
+
+The server accepts loopback only. For a multi-node run, name the networks the
+other trainer nodes come from and the address to advertise to them:
+
+```bash
+export SANDBOX_ALLOW=10.0.0.0/8          # added to loopback, not swapped for it
+export ADVERTISE_HOST=10.1.2.3           # omit to let the script detect it
 ```
 
 **Search and scholar** — one instance each, on the head node.

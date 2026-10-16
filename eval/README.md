@@ -83,7 +83,15 @@ export PYTHON_SANDBOX_BACKEND=e2b
 export E2B_API_KEY=...
 # or
 export PYTHON_SANDBOX_BACKEND=sandbox_fusion
-export SANDBOX_FUSION_ENDPOINT=http://127.0.0.1:8080
+export SANDBOX_FUSION_ENDPOINT=http://127.0.0.1:9000/run_code
+```
+
+To run that endpoint yourself, start the bundled server (see
+`train/README.md` for its settings):
+
+```bash
+cd ../train/verl
+SANDBOX_RO_ROOT=/data bash recipe/deepresearch/tools/start_local_sandbox.sh
 ```
 
 Serve the model being evaluated on its own endpoint, separate from the judge:

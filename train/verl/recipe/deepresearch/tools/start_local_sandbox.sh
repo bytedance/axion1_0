@@ -88,7 +88,13 @@ fi
 [[ -n "${SANDBOX_EXTRA_SITE:-}" ]] && echo "[sandbox] extra site-packages: $SANDBOX_EXTRA_SITE"
 unset _sbx_site
 
+# Without SANDBOX_ALLOW the server answers only loopback, so that is the
+# address worth advertising. Set both ADVERTISE_HOST and SANDBOX_ALLOW to put
+# this sandbox on the cluster network.
 ADVERTISE_HOST="${ADVERTISE_HOST:-}"
+if [[ -z "$ADVERTISE_HOST" && -z "${SANDBOX_ALLOW:-}" ]]; then
+  ADVERTISE_HOST="127.0.0.1"
+fi
 if [[ -z "$ADVERTISE_HOST" ]]; then
   _peer="${HEAD_NODE_IP:-${ARNOLD_WORKER_0_HOST:-}}"
   if [[ -n "$_peer" ]]; then

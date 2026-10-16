@@ -40,7 +40,8 @@ user.
 Access: the service executes whatever it is sent, so by default it accepts
 requests from loopback only and rejects every other peer with 403. A multi-node
 run has to widen that explicitly: set SANDBOX_ALLOW to a comma-separated list of
-CIDRs covering the training nodes, or to "any" to disable the check. There is no
+CIDRs covering the training nodes -- they are added to loopback, not swapped
+for it -- or to "any" to disable the check. There is no
 caller authentication, so the allowlist is the only boundary -- keep it as
 narrow as the deployment allows, and never put this service on an untrusted
 network.
@@ -80,16 +81,19 @@ ISOLATE = os.environ.get("SANDBOX_ISOLATE", "1").strip() == "1"
 # service from other hosts -- which a multi-node run needs -- requires setting
 # SANDBOX_ALLOW to a comma-separated list of CIDRs; SANDBOX_ALLOW=any disables
 # the check and is only ever appropriate on an isolated network.
-_DEFAULT_ALLOW = "127.0.0.0/8,::1/128,::ffff:127.0.0.0/104"
+# Loopback is always allowed: anyone on the host can already run code as this
+# user, and the start script health-checks over it. SANDBOX_ALLOW adds to this
+# list rather than replacing it.
+_LOOPBACK_ALLOW = "127.0.0.0/8,::1/128,::ffff:127.0.0.0/104"
 _ALLOW_IS_EXPLICIT = bool((os.environ.get("SANDBOX_ALLOW") or "").strip())
 
 
 def _parse_allow():
-    spec = (os.environ.get("SANDBOX_ALLOW") or _DEFAULT_ALLOW).strip()
-    if spec.lower() == "any":
+    extra = (os.environ.get("SANDBOX_ALLOW") or "").strip()
+    if extra.lower() == "any":
         return None
     nets = []
-    for part in spec.split(","):
+    for part in f"{_LOOPBACK_ALLOW},{extra}".split(","):
         part = part.strip()
         if not part:
             continue
@@ -337,10 +341,10 @@ def main():
     srv = _Server((a.host, a.port), Handler)
     if ALLOW_NETS is None:
         scope = "ANY peer (SANDBOX_ALLOW=any -- the access check is off)"
+    elif not _ALLOW_IS_EXPLICIT:
+        scope = "loopback only (set SANDBOX_ALLOW to reach this from other nodes)"
     else:
         scope = ",".join(str(n) for n in ALLOW_NETS)
-        if not _ALLOW_IS_EXPLICIT:
-            scope += "  (loopback only; set SANDBOX_ALLOW to reach this from other nodes)"
     print(f"[local-sandbox] listening on {a.host}:{a.port}  workers={a.workers} "
           f"python={PYTHON_BIN} mem={MEM_LIMIT_MB}MB", flush=True)
     print(f"[local-sandbox] accepting code from: {scope}", flush=True)

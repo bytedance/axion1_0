@@ -100,12 +100,10 @@ matplotlib==3.11.0
 googlemaps==4.10.0
 arxiv==4.0.0
 
-# ---- Transitive dependencies with an explicit floor -------------------------
-# These are pulled in by other packages, not imported directly. A floor is
-# declared so a resolver does not pick an old release: the versions below are
-# what the pinned stack actually installs, and compliance scanners otherwise
-# resolve the minimum declared by the dependency graph.
-dnspython>=2.8.0
+# ---- Transitive dependency with an explicit floor ---------------------------
+# filelock is pulled in by datasets, huggingface_hub and ray rather than
+# imported directly. The floor is declared so a resolver does not pick an old
+# release: it is what the pinned stack actually installs.
 filelock>=3.29.4
 
 # ---- Documents and retrieval ------------------------------------------------
@@ -117,5 +115,4 @@ filelock>=3.29.4
 lxml==6.1.1
 faiss-cpu==1.14.3
 sentence-transformers==5.6.0
-email-validator==2.3.0
 

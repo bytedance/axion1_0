@@ -11,6 +11,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+#
+# Modified by the Axion authors: the "api" subcommand and the
+# llamafactory.api package were removed. This project uses only
+# "llamafactory-cli train"; the OpenAI-compatible API server it started is
+# not part of the released workflow.
+#
 
 import os
 import subprocess
@@ -22,7 +28,6 @@ USAGE = (
     "-" * 70
     + "\n"
     + "| Usage:                                                             |\n"
-    + "|   llamafactory-cli api -h: launch an OpenAI-style API server       |\n"
     + "|   llamafactory-cli chat -h: launch a chat interface in CLI         |\n"
     + "|   llamafactory-cli export -h: merge LoRA adapters and export model |\n"
     + "|   llamafactory-cli train -h: train models                          |\n"
@@ -132,11 +137,6 @@ def launch():
             )
 
         sys.exit(process.returncode)
-
-    elif command == "api":
-        from .api.app import run_api
-
-        run_api()
 
     elif command == "chat":
         from .chat.chat_model import run_chat

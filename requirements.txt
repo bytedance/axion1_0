@@ -68,7 +68,6 @@ tensorboard==2.20.0
 loguru==0.7.3
 py-spy==0.4.2
 colorful==0.5.8
-opencensus==0.11.4
 opentelemetry-exporter-prometheus==0.64b0
 
 # ---- Judge and data-generation clients --------------------------------------
@@ -106,7 +105,6 @@ arxiv==4.0.0
 # declared so a resolver does not pick an old release: the versions below are
 # what the pinned stack actually installs, and compliance scanners otherwise
 # resolve the minimum declared by the dependency graph.
-cryptography>=50.0.0     # 49.x has GHSA-g6cj-pr64-35w5 (PKCS#7 Bleichenbacher)
 dnspython>=2.8.0
 filelock>=3.29.4
 

@@ -18,7 +18,7 @@ This repository contains research code: data generation, training recipes and ev
 
 Two components execute untrusted input by design:
 
-- `train/verl/recipe/deepresearch/tools/local_sandbox_server.py` runs model-generated Python. It applies process isolation, resource limits, a read-only remount of shared storage and a disconnected network namespace, and accepts requests from loopback only; a multi-node run widens that explicitly with `SANDBOX_ALLOW`. There is no caller authentication, so that allowlist is the only access boundary. This is lightweight isolation and not a hardened sandbox: run it only on a trusted network.
+- `train/verl/recipe/deepresearch/tools/local_sandbox_server.py` runs model-generated Python. It applies process isolation, resource limits, a read-only remount of shared storage and a disconnected network namespace, and accepts requests from loopback only; a multi-node run widens that explicitly with `SANDBOX_ALLOW`, which adds networks rather than replacing the list, cannot be set to a value that disables the check, and refuses ranges wider than /8. There is no caller authentication, so that allowlist is the only access boundary. This is lightweight isolation and not a hardened sandbox: run it only on a trusted network.
 - The agent tools fetch and summarise arbitrary web pages. Treat anything they return as untrusted input.
 
 Vulnerabilities in the vendored third-party components listed in `THIRD_PARTY.md` should be reported to their upstream projects.

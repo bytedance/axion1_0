@@ -40,11 +40,10 @@ user.
 Access: the service executes whatever it is sent, so by default it accepts
 requests from loopback only and rejects every other peer with 403. A multi-node
 run has to widen that explicitly: set SANDBOX_ALLOW to a comma-separated list of
-CIDRs covering the training nodes -- they are added to loopback, not swapped
-for it -- or to "any" to disable the check. There is no
-caller authentication, so the allowlist is the only boundary -- keep it as
-narrow as the deployment allows, and never put this service on an untrusted
-network.
+CIDRs covering the training nodes. They are added to loopback rather than
+swapping for it, no value turns the check off, and a range wider than /8 (IPv4)
+or /16 (IPv6) is refused at startup. Keep the list as narrow as the deployment
+allows, and never put this service on an untrusted network.
 
 Usage:
   python local_sandbox_server.py --port 9000 --workers 32
@@ -83,24 +82,37 @@ ISOLATE = os.environ.get("SANDBOX_ISOLATE", "1").strip() == "1"
 # the check and is only ever appropriate on an isolated network.
 # Loopback is always allowed: anyone on the host can already run code as this
 # user, and the start script health-checks over it. SANDBOX_ALLOW adds to this
-# list rather than replacing it.
+# list rather than replacing it, and no value switches the check off -- a
+# deployment that wants peers has to name their networks. Ranges wider than /8
+# (IPv4) or /16 (IPv6) are refused at startup, so the list cannot be opened to
+# everything by writing 0.0.0.0/0 either: the service fails to start rather
+# than coming up with an allowlist that does not mean what it looks like.
 _LOOPBACK_ALLOW = "127.0.0.0/8,::1/128,::ffff:127.0.0.0/104"
 _ALLOW_IS_EXPLICIT = bool((os.environ.get("SANDBOX_ALLOW") or "").strip())
+_MIN_PREFIXLEN = {4: 8, 6: 16}
 
 
 def _parse_allow():
-    extra = (os.environ.get("SANDBOX_ALLOW") or "").strip()
-    if extra.lower() == "any":
-        return None
-    nets = []
-    for part in f"{_LOOPBACK_ALLOW},{extra}".split(","):
+    nets, bad = [], []
+    for part in f"{_LOOPBACK_ALLOW},{os.environ.get('SANDBOX_ALLOW') or ''}".split(","):
         part = part.strip()
         if not part:
             continue
         try:
-            nets.append(ipaddress.ip_network(part, strict=False))
+            net = ipaddress.ip_network(part, strict=False)
         except ValueError:
-            print(f"[sandbox] ignoring invalid network in SANDBOX_ALLOW: {part}", flush=True)
+            bad.append(f"{part!r}: not a CIDR")
+            continue
+        if net.prefixlen < _MIN_PREFIXLEN[net.version]:
+            bad.append(f"{net}: wider than /{_MIN_PREFIXLEN[net.version]}")
+            continue
+        nets.append(net)
+    if bad:
+        for b in bad:
+            print(f"[sandbox] SANDBOX_ALLOW rejected {b}", flush=True)
+        print("[sandbox] SANDBOX_ALLOW takes CIDRs of the hosts allowed to submit code, "
+              "e.g. 10.0.0.0/8. No value disables the check.", flush=True)
+        raise SystemExit(2)
     return nets
 
 
@@ -108,8 +120,6 @@ ALLOW_NETS = _parse_allow()
 
 
 def _client_allowed(addr: str) -> bool:
-    if ALLOW_NETS is None:
-        return True
     try:
         ip = ipaddress.ip_address(addr)
     except ValueError:
@@ -339,9 +349,7 @@ def main():
     a = ap.parse_args()
     Handler.pool = ThreadPoolExecutor(max_workers=a.workers)
     srv = _Server((a.host, a.port), Handler)
-    if ALLOW_NETS is None:
-        scope = "ANY peer (SANDBOX_ALLOW=any -- the access check is off)"
-    elif not _ALLOW_IS_EXPLICIT:
+    if not _ALLOW_IS_EXPLICIT:
         scope = "loopback only (set SANDBOX_ALLOW to reach this from other nodes)"
     else:
         scope = ",".join(str(n) for n in ALLOW_NETS)

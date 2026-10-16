@@ -73,8 +73,6 @@ echo "[sandbox] read-only roots: $SANDBOX_RO_ROOT"
 # other trainer nodes reach this service over the cluster network.
 if [[ -n "${SANDBOX_ALLOW:-}" ]]; then
   echo "[sandbox] accepting code from: $SANDBOX_ALLOW"
-  [[ "${SANDBOX_ALLOW,,}" == "any" ]] && \
-    echo "[sandbox]   WARNING: the access check is off; only do this on an isolated network" >&2
 else
   echo "[sandbox] accepting code from loopback only"
   echo "[sandbox]   a multi-node run must set SANDBOX_ALLOW to the CIDRs of its trainer nodes,"

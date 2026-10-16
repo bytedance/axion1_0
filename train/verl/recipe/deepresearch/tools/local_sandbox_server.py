@@ -28,12 +28,19 @@ Protocol -- the client is the sandbox_fusion package (see python_tool.py):
   user's own code must return Success with run_result.status=Error instead.
 
 Isolation: this is lightweight isolation, not a true sandbox -- a separate
-process, a fresh temporary cwd, RLIMITs (address space, CPU, file size, process
-count), a cleared environment and python -I. That stops runaway loops, memory
-bombs, filling the disk, and following environment variables to shared storage.
-It does not stop deliberately malicious code. The model writes mathematical
-code, where the risk is accidents rather than attacks; stronger isolation needs
-a container or an unprivileged user.
+process in a fresh user, mount and network namespace (shared storage remounted
+read-only, networking disconnected), a fresh temporary cwd, RLIMITs (address
+space, CPU, file size, process count), a cleared environment and python -I.
+That stops runaway loops, memory bombs, filling the disk, and following
+environment variables to shared storage. It does not stop deliberately
+malicious code. The model writes mathematical code, where the risk is accidents
+rather than attacks; stronger isolation needs a container or an unprivileged
+user.
+
+Access: the service executes whatever it is sent, so it only accepts requests
+from loopback and the private ranges a training cluster uses. Set SANDBOX_ALLOW
+to a comma-separated list of CIDRs to change that, or to "any" to disable the
+check. Never expose this service to an untrusted network.
 
 Usage:
   python local_sandbox_server.py --port 9000 --workers 32
@@ -43,6 +50,7 @@ Usage:
   and set PYTHON_SANDBOX_BACKEND=sandbox_fusion.
 """
 import argparse
+import ipaddress
 import json
 import socket
 import os
@@ -62,6 +70,45 @@ FSIZE_LIMIT_MB = int(os.environ.get("SANDBOX_FSIZE_LIMIT_MB", "64"))
 NPROC_LIMIT = int(os.environ.get("SANDBOX_NPROC_LIMIT", "64"))
 PYTHON_BIN = os.environ.get("SANDBOX_PYTHON", sys.executable)
 ISOLATE = os.environ.get("SANDBOX_ISOLATE", "1").strip() == "1"
+
+# Networks allowed to submit code. The service executes what it is sent, so it
+# must never be reachable from an untrusted network. The default admits
+# loopback and the private ranges a training cluster uses, and rejects
+# everything else; SANDBOX_ALLOW overrides it with a comma-separated list of
+# CIDRs, and SANDBOX_ALLOW=any disables the check.
+_DEFAULT_ALLOW = "127.0.0.0/8,::1/128,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,fc00::/7,169.254.0.0/16,fe80::/10"
+
+
+def _parse_allow():
+    spec = (os.environ.get("SANDBOX_ALLOW") or _DEFAULT_ALLOW).strip()
+    if spec.lower() == "any":
+        return None
+    nets = []
+    for part in spec.split(","):
+        part = part.strip()
+        if not part:
+            continue
+        try:
+            nets.append(ipaddress.ip_network(part, strict=False))
+        except ValueError:
+            print(f"[sandbox] ignoring invalid network in SANDBOX_ALLOW: {part}", flush=True)
+    return nets
+
+
+ALLOW_NETS = _parse_allow()
+
+
+def _client_allowed(addr: str) -> bool:
+    if ALLOW_NETS is None:
+        return True
+    try:
+        ip = ipaddress.ip_address(addr)
+    except ValueError:
+        return False
+    # A dual-stack socket reports IPv4 peers as ::ffff:a.b.c.d.
+    if getattr(ip, "ipv4_mapped", None):
+        ip = ip.ipv4_mapped
+    return any(ip in net for net in ALLOW_NETS)
 #
 def _default_ro_roots() -> str:
     import glob as _g
@@ -215,7 +262,16 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def _reject_unless_allowed(self) -> bool:
+        """Close the request unless the peer is on an allowed network."""
+        if _client_allowed(self.client_address[0]):
+            return False
+        self._send(403, {"error": "client network not allowed"})
+        return True
+
     def do_GET(self):
+        if self._reject_unless_allowed():
+            return
         if self.path.rstrip("/") in ("/health", "/ping"):
             with _lock:
                 self._send(200, {"ok": True, **_stats})
@@ -223,6 +279,8 @@ class Handler(BaseHTTPRequestHandler):
             self._send(404, {"error": "not found"})
 
     def do_POST(self):
+        if self._reject_unless_allowed():
+            return
         if self.path.rstrip("/") != "/run_code":
             self._send(404, {"error": "not found"})
             return

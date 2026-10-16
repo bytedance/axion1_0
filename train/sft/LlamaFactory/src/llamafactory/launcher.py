@@ -12,10 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# Modified by the Axion authors: the "api" subcommand and the
-# llamafactory.api package were removed. This project uses only
-# "llamafactory-cli train"; the OpenAI-compatible API server it started is
-# not part of the released workflow.
+# Modified by the Axion authors: the "api", "webui" and "webchat"
+# subcommands and the llamafactory.api and llamafactory.webui packages were
+# removed. This project uses only "llamafactory-cli train"; the API server
+# and the web interface are not part of the released workflow.
 #
 
 import os
@@ -31,8 +31,6 @@ USAGE = (
     + "|   llamafactory-cli chat -h: launch a chat interface in CLI         |\n"
     + "|   llamafactory-cli export -h: merge LoRA adapters and export model |\n"
     + "|   llamafactory-cli train -h: train models                          |\n"
-    + "|   llamafactory-cli webchat -h: launch a chat interface in Web UI   |\n"
-    + "|   llamafactory-cli webui: launch LlamaBoard                        |\n"
     + "|   llamafactory-cli env: show environment info                      |\n"
     + "|   llamafactory-cli version: show version info                      |\n"
     + "| Hint: You can use `lmf` as a shortcut for `llamafactory-cli`.      |\n"
@@ -155,16 +153,6 @@ def launch():
         from .train.tuner import run_exp
 
         run_exp()
-
-    elif command == "webchat":
-        from .webui.interface import run_web_demo
-
-        run_web_demo()
-
-    elif command == "webui":
-        from .webui.interface import run_web_ui
-
-        run_web_ui()
 
     elif command == "env":
         print_env()

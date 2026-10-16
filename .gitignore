@@ -1,0 +1,50 @@
+# Byte-compiled / cache
+__pycache__/
+*.py[cod]
+*.egg-info/
+.ipynb_checkpoints/
+
+# Agent and editor state
+.claude/
+.cursor/
+.cursorrules
+.agent/
+.aider*
+.vscode/
+.idea/
+AGENTS.md
+CLAUDE.md
+
+# Compliance scan output. The sensitive-information detection tool writes
+# these into the project directory; they must never be committed.
+sensitive_info_result.txt
+opensource_git_commit.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local environments
+.venv/
+venv/
+.env
+
+# Data, checkpoints and run output.
+# These are anchored with a leading slash on purpose: an unanchored "data/"
+# also matches src/llamafactory/data/, which is framework source code.
+/data/
+/output/
+/saves/
+/logs/
+train/sft/data/*
+!train/sft/data/dataset_info.json
+*.ckpt.jsonl
+*.parquet
+*.safetensors
+*.bak
+*.bak_*
+
+# Prepared benchmark question sets -- never committed
+eval/*/*.jsonl
+eval/hle/_hle_raw/
+eval/.hipho_deps/

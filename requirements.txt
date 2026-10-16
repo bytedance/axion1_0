@@ -1,0 +1,127 @@
+# Python environment for this repository.
+#
+#   conda create -n axion python=3.12
+#   conda activate axion
+#   pip install --index-url https://download.pytorch.org/whl/cu129 \
+#       torch==2.10.0 torchvision==0.25.0 torchaudio==2.10.0
+#   pip install -r requirements.txt
+#   pip install -e train/verl
+#
+# Versions are pinned to the environment the released models were trained and
+# evaluated in: Python 3.12, CUDA 12.9.
+#
+# Four dependencies do not come from this file:
+#
+#   torch / torchvision / torchaudio   install first, from the cu129 index above
+#   verl                               install from the vendored train/verl
+#   transformer_engine                 build from source against your CUDA and
+#                                      torch; the pinned build here is 2.10.0
+#   ms-swift                           install from the vendored train/swift if
+#                                      you use the SFT recipe in train/sft
+#
+# Evaluation has one extra set of dependencies that must be installed into a
+# separate prefix, because the HiPhO grader needs antlr4 4.13.x while the
+# training stack pins 4.9.x. See eval/requirements.txt.
+
+# ---- Transformers stack -----------------------------------------------------
+transformers==5.5.4
+tokenizers==0.22.2
+safetensors==0.8.0
+accelerate==1.14.0
+peft==0.19.1
+datasets==5.0.1          # 5.0.0 has GHSA-379c-qx7v-6h59 (path traversal)
+huggingface_hub==1.21.0
+hf_transfer==0.1.9
+hf-xet==1.5.1
+sentencepiece==0.2.1
+tiktoken==0.12.0
+
+# ---- Training ---------------------------------------------------------------
+megatron-core==0.16.0
+mbridge==0.15.1
+tensordict==0.10.0
+torchdata==0.11.0
+liger_kernel==0.8.0
+flash_attn==2.8.1
+causal_conv1d==1.6.2.post1
+flash-linear-attention==0.4.1
+cupy-cuda12x==13.6.0
+optree==0.19.1
+nvtx==0.2.15
+
+# ---- Rollout / serving ------------------------------------------------------
+vllm==0.19.0
+ray==2.56.0
+xgrammar==0.1.29
+uvloop==0.22.1
+httptools==0.8.0
+websockets==16.0
+aiohttp-cors==0.8.1
+grpcio-reflection==1.81.1
+fastapi-cli==0.0.27
+
+# ---- Configuration and logging ----------------------------------------------
+hydra-core==1.3.3
+omegaconf==2.3.1
+wandb==0.26.1
+tensorboard==2.20.0
+loguru==0.7.3
+py-spy==0.4.2
+colorful==0.5.8
+opencensus==0.11.4
+opentelemetry-exporter-prometheus==0.64b0
+
+# ---- Judge and data-generation clients --------------------------------------
+openai==2.44.0
+anthropic==0.113.0
+qwen-vl-utils==0.0.14
+backoff==2.2.1
+validators==0.35.0
+
+# ---- Code sandboxes ---------------------------------------------------------
+e2b-code-interpreter==2.8.1
+sandbox-fusion==0.3.7
+
+# ---- Scientific and numeric -------------------------------------------------
+numpy==1.26.4
+pandas==3.0.3
+pyarrow==24.0.0
+scipy==1.17.1
+sympy==1.14.0
+mpmath==1.3.0
+scikit-learn==1.9.0
+mathruler==0.1.0
+matplotlib==3.11.0
+
+# ---- Stage II source data ---------------------------------------------------
+# gen_ranked_list turns ISO country codes into country names with pycountry,
+# which is LGPL-2.1. The import is guarded and falls back to the bare codes, so
+# it is left out of this list. Install it yourself, under its own licence, for
+# nicer question text:  pip install pycountry
+googlemaps==4.10.0
+arxiv==4.0.0
+
+# ---- Transitive dependencies with an explicit floor -------------------------
+# These are pulled in by other packages, not imported directly. A floor is
+# declared so a resolver does not pick an old release: the versions below are
+# what the pinned stack actually installs, and compliance scanners otherwise
+# resolve the minimum declared by the dependency graph.
+cryptography>=50.0.0     # 49.x has GHSA-g6cj-pr64-35w5 (PKCS#7 Bleichenbacher)
+dnspython>=2.8.0
+filelock>=3.29.4
+
+# ---- Documents and retrieval ------------------------------------------------
+# PDF parsing in obj_task_eval needs PyMuPDF, which is not listed here: it is
+# AGPL-3.0 (or a paid commercial licence), which this project's terms cannot
+# satisfy. The import is lazy and raises a clear error, so everything else
+# works without it. Install it yourself, under its own licence, if you need
+# that tool:  pip install pymupdf
+lxml==6.1.1
+faiss-cpu==1.14.3
+sentence-transformers==5.6.0
+email-validator==2.3.0
+
+# ---- Development ------------------------------------------------------------
+pytest==9.1.1
+ruff==0.15.20
+pre_commit==4.6.0

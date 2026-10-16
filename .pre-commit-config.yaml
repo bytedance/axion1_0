@@ -1,0 +1,22 @@
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.15.20
+    hooks:
+      - id: ruff
+        args: [--fix]
+      - id: ruff-format
+        # Formatting is checked, not enforced, so the compact generator style
+        # survives review instead of being rewritten by the formatter.
+        stages: [manual]
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: check-yaml
+        exclude: ^(train/verl|train/sft/LlamaFactory)/
+      - id: check-json
+      - id: end-of-file-fixer
+        exclude: ^(train/verl|train/sft/LlamaFactory|eval/hipho/official_impl)/
+      - id: trailing-whitespace
+        exclude: ^(train/verl|train/sft/LlamaFactory|eval/hipho/official_impl)/
+      - id: detect-private-key

@@ -32,12 +32,12 @@ install_requires = [
     "numpy>=2.0.0",
     "pandas",
     "peft",
-    "pyarrow>=19.0.0",
+    "pyarrow>=24.0.0",
     "pybind11",
     "pylatexenc",
-    "ray[default]>=2.41.0",
+    "ray[default]>=2.56.0",
     "torchdata",
-    "tensordict>=0.8.0,<=0.10.0,!=0.9.0",
+    "tensordict>=0.10.0,<=0.10.0,!=0.9.0",
     # 5.6.0 ships a broken flash-attention path (crashes on s_aux=None for
     # sink-less models); fixed in 5.6.1. See huggingface/transformers#45588.
     "transformers!=5.6.0",
@@ -51,10 +51,10 @@ PRIME_REQUIRES = ["pyext"]
 GEO_REQUIRES = ["mathruler", "torchvision", "qwen_vl_utils"]
 GPU_REQUIRES = ["liger-kernel", "flash-attn"]
 MATH_REQUIRES = ["math-verify"]  # Add math-verify as an optional dependency
-VLLM_REQUIRES = ["tensordict>=0.8.0,<=0.10.0,!=0.9.0", "vllm>=0.8.5,<=0.12.0"]
+VLLM_REQUIRES = ["tensordict>=0.10.0,<=0.10.0,!=0.9.0", "vllm>=0.8.5,<=0.12.0"]
 TRTLLM_REQUIRES = ["tensorrt-llm>=1.2.0rc6"]
 SGLANG_REQUIRES = [
-    "tensordict>=0.8.0,<=0.10.0,!=0.9.0",
+    "tensordict>=0.10.0,<=0.10.0,!=0.9.0",
     "sglang[srt,openai]==0.5.8",
     "torch==2.9.1",
 ]

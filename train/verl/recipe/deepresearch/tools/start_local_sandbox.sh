@@ -68,6 +68,18 @@ if [[ -z "$SANDBOX_RO_ROOT" ]]; then
   exit 1
 fi
 echo "[sandbox] read-only roots: $SANDBOX_RO_ROOT"
+# The server accepts loopback only unless SANDBOX_ALLOW names wider networks.
+# A single-node run needs nothing; a multi-node run has to opt in, because the
+# other trainer nodes reach this service over the cluster network.
+if [[ -n "${SANDBOX_ALLOW:-}" ]]; then
+  echo "[sandbox] accepting code from: $SANDBOX_ALLOW"
+  [[ "${SANDBOX_ALLOW,,}" == "any" ]] && \
+    echo "[sandbox]   WARNING: the access check is off; only do this on an isolated network" >&2
+else
+  echo "[sandbox] accepting code from loopback only"
+  echo "[sandbox]   a multi-node run must set SANDBOX_ALLOW to the CIDRs of its trainer nodes,"
+  echo "[sandbox]   e.g. export SANDBOX_ALLOW=10.0.0.0/8 -- otherwise they get HTTP 403"
+fi
 export SANDBOX_MEM_LIMIT_MB="${SANDBOX_MEM_LIMIT_MB:-8192}"
 _sbx_site="${SANDBOX_EXTRA_SITE:-}"
 if [[ -z "${SANDBOX_EXTRA_SITE:-}" && -d "$_sbx_site" ]]; then
@@ -150,3 +162,6 @@ echo "[sandbox] ready  $ENDPOINT"
 echo "[sandbox]   wrote $CONF"
 echo "[sandbox]   remember to set: export PYTHON_SANDBOX_BACKEND=sandbox_fusion"
 echo "[sandbox]   log $LOG    health check: curl http://127.0.0.1:${PORT}/health"
+if [[ -z "${SANDBOX_ALLOW:-}" ]]; then
+  echo "[sandbox]   note: $ENDPOINT answers 403 to every peer except loopback"
+fi

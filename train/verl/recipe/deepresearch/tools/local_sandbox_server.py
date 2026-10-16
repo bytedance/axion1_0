@@ -37,10 +37,13 @@ malicious code. The model writes mathematical code, where the risk is accidents
 rather than attacks; stronger isolation needs a container or an unprivileged
 user.
 
-Access: the service executes whatever it is sent, so it only accepts requests
-from loopback and the private ranges a training cluster uses. Set SANDBOX_ALLOW
-to a comma-separated list of CIDRs to change that, or to "any" to disable the
-check. Never expose this service to an untrusted network.
+Access: the service executes whatever it is sent, so by default it accepts
+requests from loopback only and rejects every other peer with 403. A multi-node
+run has to widen that explicitly: set SANDBOX_ALLOW to a comma-separated list of
+CIDRs covering the training nodes, or to "any" to disable the check. There is no
+caller authentication, so the allowlist is the only boundary -- keep it as
+narrow as the deployment allows, and never put this service on an untrusted
+network.
 
 Usage:
   python local_sandbox_server.py --port 9000 --workers 32
@@ -71,12 +74,14 @@ NPROC_LIMIT = int(os.environ.get("SANDBOX_NPROC_LIMIT", "64"))
 PYTHON_BIN = os.environ.get("SANDBOX_PYTHON", sys.executable)
 ISOLATE = os.environ.get("SANDBOX_ISOLATE", "1").strip() == "1"
 
-# Networks allowed to submit code. The service executes what it is sent, so it
-# must never be reachable from an untrusted network. The default admits
-# loopback and the private ranges a training cluster uses, and rejects
-# everything else; SANDBOX_ALLOW overrides it with a comma-separated list of
-# CIDRs, and SANDBOX_ALLOW=any disables the check.
-_DEFAULT_ALLOW = "127.0.0.0/8,::1/128,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,fc00::/7,169.254.0.0/16,fe80::/10"
+# Networks allowed to submit code. The service executes what it is sent and has
+# no caller authentication, so this allowlist is its only access boundary and
+# the default is the narrowest one that still works: loopback. Reaching the
+# service from other hosts -- which a multi-node run needs -- requires setting
+# SANDBOX_ALLOW to a comma-separated list of CIDRs; SANDBOX_ALLOW=any disables
+# the check and is only ever appropriate on an isolated network.
+_DEFAULT_ALLOW = "127.0.0.0/8,::1/128,::ffff:127.0.0.0/104"
+_ALLOW_IS_EXPLICIT = bool((os.environ.get("SANDBOX_ALLOW") or "").strip())
 
 
 def _parse_allow():
@@ -330,8 +335,15 @@ def main():
     a = ap.parse_args()
     Handler.pool = ThreadPoolExecutor(max_workers=a.workers)
     srv = _Server((a.host, a.port), Handler)
+    if ALLOW_NETS is None:
+        scope = "ANY peer (SANDBOX_ALLOW=any -- the access check is off)"
+    else:
+        scope = ",".join(str(n) for n in ALLOW_NETS)
+        if not _ALLOW_IS_EXPLICIT:
+            scope += "  (loopback only; set SANDBOX_ALLOW to reach this from other nodes)"
     print(f"[local-sandbox] listening on {a.host}:{a.port}  workers={a.workers} "
           f"python={PYTHON_BIN} mem={MEM_LIMIT_MB}MB", flush=True)
+    print(f"[local-sandbox] accepting code from: {scope}", flush=True)
     srv.serve_forever()
 
 

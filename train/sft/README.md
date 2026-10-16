@@ -61,7 +61,8 @@ you use different filenames.
 Then verify that nothing is dropped:
 
 ```bash
-python train/sft/check_data.py \
+USE_MCA=1 DISABLE_VERSION_CHECK=1 torchrun --nproc_per_node=1 \
+    train/sft/check_data.py \
     --model /path/to/base/model \
     --data-dir train/sft/data \
     --datasets stage1 stage2
@@ -75,8 +76,10 @@ reported only as a warning that is easy to miss in the training log.
 ## Train
 
 ```bash
-DISABLE_VERSION_CHECK=1 llamafactory-cli train train/sft/sft_stage1.yaml
-DISABLE_VERSION_CHECK=1 llamafactory-cli train train/sft/sft_stage2.yaml
+USE_MCA=1 CUDA_DEVICE_MAX_CONNECTIONS=1 DISABLE_VERSION_CHECK=1 \
+    llamafactory-cli train train/sft/sft_stage1.yaml
+USE_MCA=1 CUDA_DEVICE_MAX_CONNECTIONS=1 DISABLE_VERSION_CHECK=1 \
+    llamafactory-cli train train/sft/sft_stage2.yaml
 ```
 
 Set `model_name_or_path`, `dataset` and `output_dir` in each config first. For

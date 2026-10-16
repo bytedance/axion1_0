@@ -86,8 +86,6 @@ export PYTHON_SANDBOX_BACKEND=sandbox_fusion
 export SANDBOX_FUSION_ENDPOINT=http://127.0.0.1:8080
 ```
 
-HiPhO needs no retrieval: it is closed-book plus Python.
-
 Serve the model being evaluated on its own endpoint, separate from the judge:
 
 ```bash

@@ -1031,7 +1031,8 @@ fi
 # ---- Pin the rollout engine to a FlashAttention version ----
 # Empty by default, so no override is added and behaviour is unchanged.
 # Set ROLLOUT_FLASH_ATTN_VERSION=2 to enable it.
-# On sm_100, vLLM may select FA4 for the vision encoder, and some FA4 builds
+# On some GPU architectures, vLLM may select FA4 for the vision encoder, and
+# some FA4 builds
 # are incompatible with the installed cutlass-dsl. vLLM's availability probe
 # only checks that the file exists rather than importing it, so the selection
 # is a false positive and the engine fails to start instead of falling back.

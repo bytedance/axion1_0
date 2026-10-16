@@ -36,11 +36,10 @@ stack; `eval/README.md` explains how to install it into a separate prefix.
 ### Credentials
 
 Search, page fetching and the judge models are external services. Pass their
-keys through the environment, or put them in a file you source. Never put them
-on a command line and never commit them.
+keys through the environment, or put them in a file you source.
 
 ```bash
-# ~/.axion_keys   (chmod 600)
+# ~/.axion_keys 
 export SERPER_KEY_ID=...        # serper.dev, for search and scholar
 export JINA_API_KEYS=...        # jina.ai, for page fetching; comma-separate several
 export OPENAI_API_KEY=...       # the model that writes and audits questions
@@ -48,16 +47,6 @@ export OPENAI_API_KEY=...       # the model that writes and audits questions
 
 `datagen/stage1/README.md` and `datagen/stage2/README.md` list what each
 generator needs; `train/README.md` covers the services RL expects.
-
-## Check the installation
-
-```bash
-bash train/smoke_test.sh
-```
-
-No GPUs required. It parses every config and script, checks the recipes reject
-missing inputs, and starts the code-execution sandbox to confirm it runs code
-with its isolation in place.
 
 ## Pipeline
 
@@ -72,7 +61,7 @@ train/sft        stage 1 trains from the base model, stage 2 continues from it
 train/rl         fully-async GRPO from the stage-2 checkpoint
        |
        v
-eval/            five benchmarks
+eval/         
 ```
 
 ## Licensing

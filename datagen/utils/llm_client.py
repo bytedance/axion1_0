@@ -174,12 +174,21 @@ class LLMClient:
                     temperature=temperature,
                 )
                 text = (resp.choices[0].message.content or '').strip()
+                finish = getattr(resp.choices[0], 'finish_reason', None)
                 if len(text) < self.min_chars:
                     self.stats['empty'] += 1
                     budget = min(budget * 2, MAX_MAX_TOKENS)
                     raise EmptyResponse(f'empty content (budget now {budget})')
                 if validator and not validator(text):
                     self.stats['invalid'] += 1
+                    # A validator usually looks for something the model writes
+                    # last, so a response that ran out of tokens fails it with
+                    # content still present. Grow the budget as for an empty
+                    # response; retrying at the same size cannot succeed.
+                    if finish == 'length' and budget < MAX_MAX_TOKENS:
+                        budget = min(budget * 2, MAX_MAX_TOKENS)
+                        raise ValidationFailed(
+                            f'validator rejected a truncated response (budget now {budget})')
                     raise ValidationFailed('validator rejected the response')
                 self.stats['ok'] += 1
                 return text

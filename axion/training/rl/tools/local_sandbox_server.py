@@ -1,10 +1,6 @@
 #!/usr/bin/env python3
-# Axion relocation: canonical package/resource paths; training behavior unchanged.
 #
-# Modified by the Axion authors from the DeepResearch recipe: comments and
-# log messages translated to English, hard-coded site paths replaced with
-# environment variables or relative paths, and bug fixes. Unmodified files in
-# this directory carry their original headers.
+# Modified by the Axion authors for package paths, deployment settings and runtime fixes.
 #
 """Local code-execution service: a drop-in replacement for e2b that speaks the
 sandbox_fusion POST /run_code protocol.
@@ -170,10 +166,12 @@ def _build_cmd(script: str) -> list:
     if _extra:
         _payload = ("import sys,runpy; sys.path.append(%r); "
                     "runpy.run_path(%r, run_name='__main__')" % (_extra, script))
-        inner = ulimits + "exec %s -I -c %s" % (PYTHON_BIN, shlex.quote(_payload))
+        inner = ulimits + "exec %s -I -c %s" % (shlex.quote(PYTHON_BIN), shlex.quote(_payload))
     else:
-        inner = ulimits + f"exec {PYTHON_BIN} -I {script}"
-    if ISOLATE and shutil.which("unshare"):
+        inner = ulimits + f"exec {shlex.quote(PYTHON_BIN)} -I {shlex.quote(script)}"
+    if ISOLATE:
+        if not shutil.which("unshare"):
+            raise RuntimeError("SANDBOX_ISOLATE=1 requires unshare; refusing unisolated execution")
         guard = "".join(
             f"mount -o remount,ro,bind {shlex.quote(root)} 2>/dev/null || "
             "{ echo 'sandbox: failed to remount storage read-only' >&2; exit 97; }; "

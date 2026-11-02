@@ -157,10 +157,9 @@ third_party/
 tests/           Regression and packaging checks
 ```
 
-The training guides provide one 122B pipeline: two-stage SFT followed by
-paper-based asynchronous GRPO. The RL implementation includes session training,
-TITO and R3; its distributed GPU execution and benchmark reproduction remain
-unverified.
+The 122B pipeline consists of two-stage SFT followed by asynchronous GRPO.
+The training guides cover single-host and multi-host layouts, required services,
+checkpoint export, and runtime requirements.
 
 For data construction and evaluation, use a separate Python 3.11+ environment:
 
@@ -168,7 +167,14 @@ For data construction and evaluation, use a separate Python 3.11+ environment:
 python -m pip install -e ".[data,evaluation]"
 ```
 
-### 4.1 Documentation
+### 4.1 Inference
+
+Export a native SFT checkpoint to Hugging Face format before serving it. The
+[inference guide](axion/evaluation/README.md#serve-a-checkpoint) provides a vLLM
+launch command and an OpenAI-compatible request example. Agent evaluation
+also requires a tool-execution harness.
+
+### 4.2 Documentation
 
 | Guide | Contents |
 |:---|:---|

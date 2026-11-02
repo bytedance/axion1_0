@@ -5,21 +5,12 @@ __pycache__/
 *.egg-info/
 .ipynb_checkpoints/
 
-# Agent and editor state
-.claude/
-.cursor/
-.cursorrules
-.agent/
-.agents/
-.codex/
-.aider*
-.vscode/
-.idea/
-AGENTS.md
-CLAUDE.md
+# Local configuration and editor directories
+.[!.]*/
+!.github/
+*.code-workspace
 
-# Compliance scan output. The sensitive-information detection tool writes
-# these into the project directory; they must never be committed.
+# Local scan reports
 sensitive_info_result.txt
 opensource_git_commit.log
 
@@ -32,9 +23,7 @@ Thumbs.db
 venv/
 .env
 
-# Data, checkpoints and run output.
-# These are anchored with a leading slash on purpose: an unanchored "data/"
-# also matches src/llamafactory/data/, which is framework source code.
+# Data, checkpoints and run output
 /data/
 /output/
 /saves/
@@ -61,7 +50,7 @@ eval/.hipho_deps/
 /third_party/*/dist/
 .pytest_cache/
 
-# Canonical evaluation paths (eval/ remains a compatibility alias)
+# Evaluation outputs
 axion/evaluation/.hipho_deps/
 axion/evaluation/*/*.jsonl
 axion/evaluation/hle/_hle_raw/

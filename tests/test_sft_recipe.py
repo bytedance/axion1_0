@@ -10,7 +10,7 @@ import subprocess
 import struct
 import sys
 import tempfile
-from types import SimpleNamespace
+from types import ModuleType, SimpleNamespace
 from typing import Literal, Optional
 import unittest
 from unittest import mock
@@ -47,7 +47,7 @@ class LaunchTests(unittest.TestCase):
         command = ['bash', str(ROOT / 'train.sh'), stage, '--model', str(self.model),
                    '--dataset', str(self.data), '--output', str(self.base / 'output'),
                    '--master-addr', 'trainer-head.example', '--node-rank', '0', '--dry-run', *more]
-        clean_env = {k: v for k, v in os.environ.items() if k not in {'NNODES', 'NPROC_PER_NODE', 'WORLD_SIZE'}}
+        clean_env = {k: v for k, v in os.environ.items() if k not in {'NNODES', 'NPROC_PER_NODE', 'WORLD_SIZE', 'NODE_RANK', 'MASTER_ADDR', 'CUDA_VISIBLE_DEVICES'}}
         clean_env.update(env or {})
         return subprocess.run(command, text=True, capture_output=True, env=clean_env)
 
@@ -103,6 +103,96 @@ class LaunchTests(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             self.assertIn('32', result.stderr)
         self.assertNotEqual(self.run_launch(more=('--node-rank', '4')).returncode, 0)
+
+    def test_smaller_topologies_preserve_learning_recipe(self):
+        reference = self.plan()
+        for nodes, world, dp, expert_dp, accumulation in [(1, 8, 2, 1, 4), (2, 16, 4, 2, 2)]:
+            with self.subTest(nodes=nodes):
+                plan = self.plan(more=('--nnodes', str(nodes), '--nproc-per-node', '8'))
+                self.assertEqual(plan['config'], reference['config'])
+                self.assertEqual(plan['world_size'], world)
+                self.assertEqual(plan['data_parallel_size'], dp)
+                self.assertEqual(plan['expert_data_parallel_size'], expert_dp)
+                self.assertEqual(plan['gradient_accumulation_steps'], accumulation)
+                self.assertIn(f'--nnodes={nodes}', plan['command'])
+                self.assertEqual(plan['environment']['NNODES'], str(nodes))
+                stage2 = self.plan('stage2', ('--nnodes', str(nodes), '--mcore-model', str(self.checkpoint)))
+                self.assertEqual(stage2['world_size'], world)
+                self.assertEqual(stage2['config']['global_batch_size'], 8)
+
+    def test_single_node_defaults_rank_and_master_only_for_single_node(self):
+        command = [sys.executable, str(ROOT / 'launcher.py'), 'stage1', '--model', str(self.model),
+                   '--dataset', str(self.data), '--output', str(self.base / 'output'), '--dry-run']
+        env = {k: v for k, v in os.environ.items() if k not in {
+            'NNODES', 'NPROC_PER_NODE', 'WORLD_SIZE', 'NODE_RANK', 'MASTER_ADDR', 'CUDA_VISIBLE_DEVICES'}}
+        result = subprocess.run([*command, '--nnodes', '1'], text=True, capture_output=True, env=env)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        plan = json.loads(result.stdout)
+        self.assertEqual(plan['environment']['NODE_RANK'], '0')
+        self.assertEqual(plan['environment']['MASTER_ADDR'], 'localhost')
+        result = subprocess.run(command, text=True, capture_output=True, env=env)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('node-rank', result.stderr)
+        result = subprocess.run([*command, '--node-rank', '0'], text=True, capture_output=True, env=env)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('master-addr', result.stderr)
+
+    def test_invalid_topologies_fail_before_workers(self):
+        cases = [('--nnodes', '0'), ('--nproc-per-node', '0'),
+                 ('--nnodes', '1', '--nproc-per-node', '4'), ('--nnodes', '3'),
+                 ('--nnodes', '8'), ('--nnodes', '1', '--node-rank', '1')]
+        for flags in cases:
+            with self.subTest(flags=flags):
+                result = self.run_launch(more=flags)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertNotIn('unrecognized arguments', result.stderr)
+
+    def test_selected_topology_checks_inherited_environment(self):
+        plan = self.run_launch(more=('--nnodes', '1'), env={
+            'NNODES': '1', 'NPROC_PER_NODE': '8', 'WORLD_SIZE': '8'})
+        self.assertEqual(plan.returncode, 0, plan.stderr)
+        for env in ({'NNODES': '4'}, {'NPROC_PER_NODE': '4'}, {'WORLD_SIZE': '32'}):
+            result = self.run_launch(more=('--nnodes', '1'), env=env)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn(next(iter(env)), result.stderr)
+
+    def test_visible_gpu_selection_is_preserved_and_validated(self):
+        selected = '7,6,5,4,3,2,1,0'
+        result = self.run_launch(more=('--nnodes', '1'), env={'CUDA_VISIBLE_DEVICES': selected})
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(json.loads(result.stdout)['environment']['CUDA_VISIBLE_DEVICES'], selected)
+        for selected in ('0,1', '', '-1', '0,0,1,2,3,4,5,6'):
+            result = self.run_launch(more=('--nnodes', '1'), env={'CUDA_VISIBLE_DEVICES': selected})
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn('CUDA_VISIBLE_DEVICES', result.stderr)
+        result = self.run_launch(more=('--nnodes', '2', '--nproc-per-node', '4'))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(json.loads(result.stdout)['environment']['CUDA_VISIBLE_DEVICES'], '0,1,2,3')
+
+    def test_deployment_network_selection_reaches_workers(self):
+        spec = importlib.util.spec_from_file_location('launcher_network_test', ROOT / 'launcher.py')
+        launcher = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(launcher)
+        runtime = ModuleType('runtime')
+        runtime.verify_runtime = lambda: None
+        command = ['launcher', 'stage1', '--model', str(self.model), '--dataset', str(self.data),
+                   '--output', str(self.base / 'output'), '--master-addr', 'head', '--node-rank', '0']
+        env = {k: v for k, v in os.environ.items() if k not in {
+            'NNODES', 'NPROC_PER_NODE', 'WORLD_SIZE', 'CUDA_VISIBLE_DEVICES'}}
+        env.update({'NCCL_IB_HCA': '=mlx5_0:1', 'NCCL_SOCKET_IFNAME': 'ib0'})
+        observed = {}
+        def launch_child(command, env):
+            observed.update(env)
+            return SimpleNamespace(returncode=0)
+        with mock.patch.dict(os.environ, env, clear=True), mock.patch.object(sys, 'argv', command), \
+             mock.patch.dict(sys.modules, {'runtime': runtime}), \
+             mock.patch.object(launcher, 'resolve_swift_package', return_value=ROOT), \
+             mock.patch.object(launcher.subprocess, 'run', side_effect=launch_child):
+            with self.assertRaises(SystemExit) as result:
+                launcher.main()
+        self.assertEqual(result.exception.code, 0)
+        self.assertEqual(observed.get('NCCL_IB_HCA'), '=mlx5_0:1')
+        self.assertEqual(observed.get('NCCL_SOCKET_IFNAME'), 'ib0')
 
     def test_missing_or_overlength_metadata_is_rejected(self):
         for row in ({'messages': []}, {'messages': [], 'total_tokens': 131073, 'visual_tokens': 0}):
@@ -211,10 +301,119 @@ class ExportCheckTests(unittest.TestCase):
                 header = json.dumps({'weight': {'shape': [count], 'dtype': 'BF16', 'data_offsets': [0, 0]}}).encode()
                 (root / 'model.safetensors').write_bytes(struct.pack('<Q', len(header)) + header)
             write_header(60000000000)
-            with self.assertRaisesRegex(ValueError, 'incomplete'):
+            with self.assertRaises(ValueError):
                 module.verify_export(root)
             write_header(122000000000)
-            self.assertEqual(module.verify_export(root)['parameters'], 122000000000)
+            with self.assertRaisesRegex(ValueError, 'safetensors'):
+                module.verify_export(root)
+
+
+class ExportStructureTests(unittest.TestCase):
+    def setUp(self):
+        spec = importlib.util.spec_from_file_location('export_structure_test', ROOT / 'launcher.py')
+        self.launcher = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(self.launcher)
+        tmp = tempfile.TemporaryDirectory(prefix='axion-export-structure-')
+        self.addCleanup(tmp.cleanup)
+        self.root = Path(tmp.name)
+
+    def shard(self, header, payload=b'', name='model.safetensors'):
+        data = json.dumps(header).encode() if isinstance(header, dict) else header
+        path = self.root / name
+        path.write_bytes(struct.pack('<Q', len(data)) + data + payload)
+        return path
+
+    def test_reads_valid_small_tensors_and_zero_length_tensors_without_payload_load(self):
+        path = self.shard({
+            'matrix': {'shape': [2, 3], 'dtype': 'BF16', 'data_offsets': [0, 12]},
+            'scalar': {'shape': [], 'dtype': 'F32', 'data_offsets': [12, 16]},
+            'empty': {'shape': [0], 'dtype': 'F32', 'data_offsets': [16, 16]},
+        }, bytes(16))
+        self.assertEqual(self.launcher.safetensors_parameters(path), {'matrix': 6, 'scalar': 1, 'empty': 0})
+
+    def test_rejects_truncated_overlapping_and_invalid_tensor_headers(self):
+        cases = [
+            ({'w': {'shape': [2], 'dtype': 'BF16', 'data_offsets': [0, 4]}}, bytes(2)),
+            ({'w': {'shape': [1], 'dtype': 'BF16', 'data_offsets': [0, 2]},
+              'v': {'shape': [1], 'dtype': 'BF16', 'data_offsets': [0, 2]}}, bytes(2)),
+            ({'w': {'shape': [-1], 'dtype': 'BF16', 'data_offsets': [0, 0]}}, b''),
+            ({'w': {'shape': [True], 'dtype': 'BF16', 'data_offsets': [0, 2]}}, bytes(2)),
+            ({'w': {'shape': [1], 'dtype': 'INVALID', 'data_offsets': [0, 1]}}, bytes(1)),
+            ({'w': {'shape': [1], 'dtype': 'BF16', 'data_offsets': [0, 4]}}, bytes(4)),
+            ({'w': {'shape': [1], 'dtype': 'BF16', 'data_offsets': [2, 4]}}, bytes(4)),
+            (b'{"w":{"shape":[0],"dtype":"BF16","data_offsets":[0,0]},"w":{"shape":[0],"dtype":"BF16","data_offsets":[0,0]}}', b''),
+        ]
+        for header, payload in cases:
+            with self.subTest(header=header):
+                with self.assertRaisesRegex(ValueError, 'safetensors'):
+                    self.launcher.safetensors_parameters(self.shard(header, payload))
+        for data in (b'', struct.pack('<Q', 1000) + b'{}'):
+            path = self.root / 'short.safetensors'; path.write_bytes(data)
+            with self.assertRaisesRegex(ValueError, 'safetensors'):
+                self.launcher.safetensors_parameters(path)
+
+    def test_valid_shard_index_and_global_count_are_checked(self):
+        (self.root / 'config.json').write_text('{}')
+        (self.root / 'tokenizer.json').write_text('{}')
+        for name in ('one.safetensors', 'two.safetensors'):
+            (self.root / name).touch()
+        index = self.root / 'model.safetensors.index.json'
+        index.write_text(json.dumps({'weight_map': {'a': 'one.safetensors', 'b': 'two.safetensors'}}))
+        shards = [{'a': 61000000000}, {'b': 61000000000}]
+        with mock.patch.object(self.launcher, 'safetensors_parameters', side_effect=shards):
+            self.assertEqual(self.launcher.verify_export(self.root)['parameters'], 122000000000)
+        for weight_map in ({'a': 'one.safetensors'}, {'a': 'two.safetensors', 'b': 'one.safetensors'}):
+            index.write_text(json.dumps({'weight_map': weight_map}))
+            with mock.patch.object(self.launcher, 'safetensors_parameters', side_effect=shards):
+                with self.assertRaisesRegex(ValueError, 'index'):
+                    self.launcher.verify_export(self.root)
+        with mock.patch.object(self.launcher, 'safetensors_parameters', side_effect=[{'a': 61000000000}] * 2):
+            with self.assertRaisesRegex(ValueError, 'Duplicate'):
+                self.launcher.verify_export(self.root)
+
+
+class DirectExportWeightTests(unittest.TestCase):
+    def setUp(self):
+        filename = Path(__file__).resolve().parents[1] / 'third_party/swift/swift/megatron/utils/megatron_lm_utils.py'
+        function = next(node for node in ast.parse(filename.read_text()).body
+                        if isinstance(node, ast.FunctionDef) and node.name == 'dcp_direct_load_backbone')
+        self.namespace = {'logger': SimpleNamespace(info=lambda *a: None, warning=lambda *a: None),
+                          'torch': SimpleNamespace(empty=lambda *a, **k: object())}
+        exec(compile(ast.Module(body=[function], type_ignores=[]), str(filename), 'exec'), self.namespace)
+
+    def load(self, parameter_names, checkpoint_names, extra_missing=()):
+        # GPU packages are unavailable in CPU publication tests. Exercise the real
+        # loader, replacing only checkpoint I/O and the model's state-dict interface.
+        parameters = dict(parameter_names)
+        dcp = ModuleType('torch.distributed.checkpoint')
+        metadata = {'model.module.' + name: SimpleNamespace(size=(1,), properties=SimpleNamespace(dtype='bf16'))
+                    for name in checkpoint_names}
+        dcp.FileSystemReader = lambda path: SimpleNamespace(read_metadata=lambda: SimpleNamespace(state_dict_metadata=metadata))
+        dcp.load = lambda *a, **k: None
+        dist = ModuleType('torch.distributed'); dist.checkpoint = dcp
+        torch_module = ModuleType('torch'); torch_module.distributed = dist
+        def load_state_dict(state, strict):
+            return SimpleNamespace(missing_keys=[name for name in parameters if name not in state] + list(extra_missing),
+                                   unexpected_keys=[name for name in state if name not in parameters])
+        model = SimpleNamespace(load_state_dict=load_state_dict,
+                                named_parameters=lambda remove_duplicate=True: list(parameters.items()))
+        with mock.patch.dict(sys.modules, {'torch': torch_module, 'torch.distributed': dist,
+                                          'torch.distributed.checkpoint': dcp}):
+            return self.namespace['dcp_direct_load_backbone'](model, '/fixture')
+
+    def test_missing_actual_backbone_parameter_aborts_export(self):
+        for name in ('decoder.layers.0.weight', 'vision_model.weight'):
+            with self.subTest(name=name), self.assertRaisesRegex(RuntimeError, name):
+                self.load([(name, object())], [])
+
+    def test_loaded_tied_parameter_alias_and_extra_state_are_allowed(self):
+        shared = object()
+        result = self.load([('embedding.weight', shared), ('output.weight', shared)], ['embedding.weight'],
+                           extra_missing=['decoder._extra_state', 'rotary.nonpersistent_buffer'])
+        self.assertEqual(result[0], 1)
+
+    def test_all_distinct_parameters_load(self):
+        self.assertEqual(self.load([('weight', object())], ['weight']), (1, [], []))
 
 
 class ExportArgumentTests(unittest.TestCase):

@@ -1,9 +1,6 @@
 #!/usr/bin/env python3
 #
-# Modified by the Axion authors from the DeepResearch recipe: comments and
-# log messages translated to English, hard-coded site paths replaced with
-# environment variables or relative paths, and bug fixes. Unmodified files in
-# this directory carry their original headers.
+# Modified by the Axion authors for package paths, deployment settings and runtime fixes.
 #
 """Rebuild the pool's FAISS index (the semantic layer) from the sqlite shards
 of the read-only shared pool.

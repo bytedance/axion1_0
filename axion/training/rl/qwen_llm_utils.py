@@ -1,8 +1,5 @@
 #
-# Modified by the Axion authors from the DeepResearch recipe: comments and
-# log messages translated to English, hard-coded site paths replaced with
-# environment variables or relative paths, and bug fixes. Unmodified files in
-# this directory carry their original headers.
+# Modified by the Axion authors for package paths, deployment settings and runtime fixes.
 #
 """Shared helpers for driving the local Qwen3.5-27B eval/summary/memory vLLM.
 

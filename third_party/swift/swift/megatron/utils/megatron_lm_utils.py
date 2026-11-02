@@ -694,6 +694,17 @@ def dcp_direct_load_backbone(model, checkpoint_dir: str, prefix: str = 'model.mo
     real_unexpected = [k for k in unexpected if '_extra_state' not in k]
     logger.info(f'[dcp-direct] loaded {len(model_sd)} tensors. '
                 f'missing(non-extra)={len(real_missing)} unexpected(non-extra)={len(real_unexpected)}')
+    # An absent parameter would otherwise be exported from an uninitialized model.
+    # Enumerate aliases too: loading one name of a tied weight initializes both names.
+    # Frozen vision weights remain parameters; non-persistent buffers and TE extra
+    # state are not required backbone weights.
+    parameters = dict(model.named_parameters(remove_duplicate=False))
+    loaded_parameters = {id(parameters[key]) for key in model_sd if key in parameters}
+    missing_weights = [key for key in real_missing
+                       if key in parameters and id(parameters[key]) not in loaded_parameters]
+    if missing_weights:
+        raise RuntimeError(f'DCP export is missing {len(missing_weights)} model parameters: '
+                           f'{missing_weights[:10]}')
     if real_missing:
         logger.warning(f'[dcp-direct] missing (sample): {real_missing[:10]}')
     if real_unexpected:

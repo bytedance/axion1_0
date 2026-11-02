@@ -1,12 +1,11 @@
 # Evaluation
 
-Five benchmarks: how to build each question set, and how to grade rollouts on it.
+Dataset preparation and rollout grading for FrontierScience Olympiad,
+FrontierScience Research, HiPhO, HLE-130 and SEAL-0.
 
-**No benchmark data is in this repository.** Each directory has a `prepare.py`
-that downloads its source and converts it. The only exception is
-`hle/subset_130_ids.txt`, a list of 130 item ids with no questions and no
-answers, so the HLE subset used here can be rebuilt without redistributing a
-gated dataset.
+Each benchmark has a `prepare.py` that downloads and converts its source
+data. The repository includes only the HLE subset IDs in
+`hle/subset_130_ids.txt`; benchmark questions and answers are downloaded separately.
 
 | | items | source | grade with |
 |--|--|--|--|
@@ -43,6 +42,41 @@ pip install --target .hipho_deps -r requirements.txt
 export PYTHONPATH=$PWD/.hipho_deps        # only needed when grading HiPhO
 ```
 
+## Serve a checkpoint
+
+Use the Hugging Face directory produced by [SFT export](../training/sft/README.md#export).
+It must contain the weights, model configuration and tokenizer, including its
+chat template. Native Megatron checkpoints need conversion first.
+
+Prepare a separate vLLM environment using the
+[Qwen deployment guide](https://recipes.vllm.ai/Qwen/Qwen3.5-122B-A10B).
+For an eight-GPU server:
+
+```bash
+vllm serve /shared/sft-stage2-hf \
+  --served-model-name axion-122b \
+  --host 127.0.0.1 --port 8000 \
+  --tensor-parallel-size 8 --dtype bfloat16 \
+  --max-model-len 131072 \
+  --reasoning-parser qwen3 \
+  --enable-auto-tool-choice --tool-call-parser qwen3_coder
+```
+
+Choose tensor parallelism and context capacity for the available GPU memory.
+For remote clients, bind to a reachable interface on the service network.
+In another terminal, check the model ID and send a request:
+
+```bash
+curl --fail-with-body http://127.0.0.1:8000/v1/models
+curl --fail-with-body http://127.0.0.1:8000/v1/chat/completions \
+  -H 'Content-Type: application/json' \
+  -d '{"model":"axion-122b","messages":[{"role":"user","content":"What is 2 + 3?"}],"max_tokens":1024}'
+```
+
+This checks model serving. Benchmark rollouts additionally require an agent
+harness that runs tools and writes the format below. GPU serving and paper
+benchmark results have not been revalidated for this release.
+
 ## Configuring the APIs
 
 ### The judge
@@ -55,8 +89,7 @@ export OPENAI_API_KEY=sk-...          # key used for grading
 export OPENAI_MODEL=gpt-5.5           # judge model
 ```
 
-That is the whole configuration for the OpenAI API. To use another
-OpenAI-compatible server, add its base URL:
+For another OpenAI-compatible service, set its base URL:
 
 ```bash
 export OPENAI_BASE_URL=https://my-endpoint.example.com/v1
@@ -77,9 +110,8 @@ is written into the report.
 
 ### The agent being evaluated
 
-Rollouts are produced outside this repository, but the four benchmarks that
-allow retrieval need these services, so the keys are listed here for
-completeness. The harness reads them from the environment:
+The external agent harness needs retrieval services for tool-enabled
+evaluation. Configure the service credentials it uses:
 
 ```bash
 export SERPER_KEY_ID=...              # web search
@@ -102,16 +134,16 @@ To run that endpoint yourself, start the bundled
 on the same port:
 
 ```bash
-cd ../training/rl
-SANDBOX_RO_ROOT=/data SANDBOX_PORT=9000 \
-  bash tools/start_local_sandbox.sh
+(
+  cd ../training/rl
+  SANDBOX_RO_ROOT=/data SANDBOX_PORT=9000 \
+    bash tools/start_local_sandbox.sh
+)
 ```
 
-Serve the model being evaluated on its own endpoint, separate from the judge:
-
-```bash
-vllm serve <model> --enable-prefix-caching --port 8000
-```
+Serve the evaluated model on a separate endpoint from the judge, as described
+in [Serve a checkpoint](#serve-a-checkpoint). Tool calls returned by the model
+must be executed by the harness and added to the next request as tool messages.
 
 ## Rollout format
 

@@ -183,7 +183,7 @@
   "megatron/utils/__init__.py": "3586760b9de8bd05d9866727a6427081ef40ffdd804fa47dac008507cab45ebc",
   "megatron/utils/convert_utils.py": "04ab38ff45634955310ea33eb0e31bd0362f7d93a7dd4a5aef2c666638a2410e",
   "megatron/utils/hdfs_checkpoint.py": "8cbdb4ef5cee53805fc29d12fd75d3a26bd5abc292a8d5da3e1fe6247b02676c",
-  "megatron/utils/megatron_lm_utils.py": "cf5e06f265c545fa43056d56c08c1229c19f0f003aa9b8fef3a6f8adef12d199",
+  "megatron/utils/megatron_lm_utils.py": "7aabef45428360f15e31cee7dd0dc4df9f81e929baaa080b91f02955f086bfaa",
   "megatron/utils/nvtx_profiler.py": "9b5a0c4f9ce8e0ffe7c4a9bc2df7d2eff3835d106ffc501f22808aab2978db8b",
   "megatron/utils/parallel_utils.py": "bd702e6b22ced4961259a8332007dded178faaed1d828b4dae80598c95d04753",
   "megatron/utils/patcher.py": "87239d8527806a7a2fdbd5d7309246abc2c8fe84984d18e7e7990302c32c5dab",

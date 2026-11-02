@@ -115,7 +115,9 @@
     "Declare and preflight the vendored Qwen3.5 loader requirements qwen-vl-utils>=0.0.14 and decord. Their original installed versions are unknown.",
     "Retain source launcher TE preload skip, conditional CUDA13 cuBLAS preload, HTTP pool and GPU visibility defaults, and cache/profiling cleanup. Initialize CUDA_DEVICE_MAX_CONNECTIONS=1 so the existing FSDP initialization changes it to8 in its original order.",
     "Leave NCCL network interface and RDMA selection to the deployment instead of retaining scheduler-specific eth0/GID3 defaults.",
-    "Remove optional private dataset transforms while retaining explicit unsupported adapters and unchanged standard message preprocessing/cache defaults."
+    "Remove optional private dataset transforms while retaining explicit unsupported adapters and unchanged standard message preprocessing/cache defaults.",
+    "Allow explicit compatible node/process layouts while retaining the default32-GPU topology and the original model, parallelism, microbatch, globalbatch and optimization settings.",
+    "Preserve deployment NCCL_IB_HCA and selected export GPUs. Reject missing model parameters and incomplete safetensors payloads or indexes during export validation."
   ],
   "length_tool_published_sha256": "13c6912ac8c61045565707586ef63488d2359da14ccbd01c00d27fb5b50efbc1",
   "tokenizer_provenance": {

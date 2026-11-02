@@ -71,6 +71,10 @@
     {
       "path": "swift/template/base.py",
       "change": "Remove unrelated private experiment references from comments; executable code is unchanged."
+    },
+    {
+      "path": "swift/megatron/utils/megatron_lm_utils.py",
+      "change": "Reject DCP export when actual model parameters are missing, allowing genuinely shared parameter aliases already loaded. Training computation and checkpoint writing are unchanged."
     }
   ],
   "integrity": {
@@ -91,7 +95,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "93fd50af6e6d472f6b0761af8a4398ec06fb3f55990bb6c89997193956256ae4",
+      "sha256": "fa549677b23460d00a18b08ea7d764e7e1677c53099ec3788fab75f13e9fc2e1",
       "source_sha256": "fcb77c14dbbba7020164810e7eecd423b236f6889bd2a7c823ce2f24bee53f0b"
     },
     {
@@ -1066,7 +1070,7 @@
     },
     {
       "path": "swift/megatron/utils/megatron_lm_utils.py",
-      "sha256": "cf5e06f265c545fa43056d56c08c1229c19f0f003aa9b8fef3a6f8adef12d199",
+      "sha256": "7aabef45428360f15e31cee7dd0dc4df9f81e929baaa080b91f02955f086bfaa",
       "source_sha256": "511e29ef0e22b376ba08000ae7a505b03b02f333f15b27951ed4952284a154df"
     },
     {

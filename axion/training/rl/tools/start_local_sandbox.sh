@@ -5,12 +5,9 @@
 #
 #
 #
-# Modified by the Axion authors from the DeepResearch recipe: comments and
-# log messages translated to English, hard-coded site paths replaced with
-# environment variables or relative paths, and bug fixes. Unmodified files in
-# this directory carry their original headers.
+# Modified by the Axion authors for package paths, deployment settings and runtime fixes.
 #
-set -uo pipefail
+set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CONF="${PYTHON_NODES_CONF:-$HERE/../config/python_nodes.conf}"
@@ -27,12 +24,6 @@ PY_CONFIG
   exit 1
 fi
 export SANDBOX_RO_ROOT
-for pid in $(ps -eo pid,cmd | grep "local_sandbox_serve[r].py" | awk '{print $1}'); do
-  echo "[sandbox] stopping old instance pid=$pid"
-  kill "$pid" 2>/dev/null
-done
-sleep 1
-
 _port_busy() { (ss -tln 2>/dev/null || netstat -tln 2>/dev/null) | grep -qE "[:.]$1[[:space:]]"; }
 _port_forbidden() {
   local p="$1"
@@ -112,11 +103,24 @@ ENDPOINT="http://${ADVERTISE_HOST}:${PORT}/run_code"
 
 
 echo "[sandbox] starting port=$PORT workers=$WORKERS exec-python=$SANDBOX_PYTHON isolate=$SANDBOX_ISOLATE"
+SERVER_PID=""
+cleanup_failed_start() {
+  local status=$?
+  if [[ -n "$SERVER_PID" ]]; then
+    kill -- "-$SERVER_PID" 2>/dev/null || true
+    wait "$SERVER_PID" 2>/dev/null || true
+  fi
+  return "$status"
+}
+trap cleanup_failed_start EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 setsid nohup "$SERVER_PY" "$HERE/local_sandbox_server.py" \
   --host "::" --port "$PORT" --workers "$WORKERS" > "$LOG" 2>&1 < /dev/null &
+SERVER_PID=$!
 
 for _ in $(seq 1 30); do
-  curl -sf --max-time 2 "http://127.0.0.1:${PORT}/health" >/dev/null && break
+  curl -sf --noproxy '*' --max-time 2 "http://127.0.0.1:${PORT}/health" >/dev/null && break
   sleep 1
 done
 if ! curl -sf --noproxy '*' --max-time 2 "http://127.0.0.1:${PORT}/health" >/dev/null; then
@@ -129,10 +133,10 @@ if ! curl -sf --noproxy '*' --max-time 5 "http://${ADVERTISE_HOST}:${PORT}/healt
 fi
 echo "[sandbox] advertised address reachable: http://${ADVERTISE_HOST}:${PORT}"
 
-"$SERVER_PY" - "$PORT" "${SANDBOX_RO_ROOT%%,*}" <<'PY'
+if ! "$SERVER_PY" - "$PORT" "$SANDBOX_RO_ROOT" <<'PY'
 import json, sys, urllib.request
 port = sys.argv[1]
-ro_root = sys.argv[2]
+ro_roots = sys.argv[2].split(',')
 _op = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 def run(code):
     req = urllib.request.Request(f"http://127.0.0.1:{port}/run_code",
@@ -141,10 +145,19 @@ def run(code):
     return json.load(_op.open(req, timeout=60))["run_result"]
 a = run("import sympy;print(sympy.isprime(2**61-1))")
 c = run("import scipy,pandas;print('EXTRA_OK',scipy.__version__,pandas.__version__)")
-b = run("open(%r,'w').write('x');print('WRITABLE')" % (ro_root + "/__sbx_probe"))
+b = run("import errno, os, tempfile\n"
+        "for root in %r:\n"
+        "    try:\n"
+        "        fd, path = tempfile.mkstemp(prefix='.axion_probe_', dir=root)\n"
+        "    except OSError as exc:\n"
+        "        if exc.errno not in (errno.EROFS, errno.EACCES, errno.EPERM): raise\n"
+        "    else:\n"
+        "        os.close(fd); os.unlink(path)\n"
+        "        raise RuntimeError('storage is writable: ' + root)\n"
+        "print('READ_ONLY')" % ro_roots)
 ok = a["status"] == "Finished" and a["stdout"].strip() == "True"
 iso_broken = any(x.get("return_code") == 97 for x in (a, b, c))
-ro = (b["status"] == "Error") and b.get("return_code") != 97
+ro = b["status"] == "Finished" and b.get("stdout", "").strip() == "READ_ONLY"
 extra = "EXTRA_OK" in (c.get("stdout") or "")
 if iso_broken:
     print("[sandbox] smoke test: isolation setup failed (return_code=97); the checks below are meaningless")
@@ -157,7 +170,7 @@ if not ok:
     print("[sandbox]   compute failure stderr: " + (a.get("stderr") or "")[:300])
 sys.exit(0 if (ok and ro) else 1)
 PY
-[[ $? -ne 0 ]] && { echo "[sandbox] smoke test failed" >&2; exit 1; }
+then echo "[sandbox] smoke test failed" >&2; exit 1; fi
 
 mkdir -p "$(dirname "$CONF")"
 #
@@ -165,6 +178,7 @@ _conf_tmp="$(mktemp "${CONF}.tmp.XXXXXX")"
 printf 'endpoint=%s\n' "$ENDPOINT" > "$_conf_tmp"
 mv -f "$_conf_tmp" "$CONF"
 unset _conf_tmp
+trap - EXIT INT TERM
 echo "[sandbox] ready  $ENDPOINT"
 echo "[sandbox]   wrote $CONF"
 echo "[sandbox]   remember to set: export PYTHON_SANDBOX_BACKEND=sandbox_fusion"

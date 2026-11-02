@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Axion relocation: canonical package/resource paths; training behavior unchanged.
+# Modified by the Axion authors for package and resource paths.
 # Initialize the FAISS scholar store: merge shards -> build FAISS index.
 # Read paths from config/tools.yaml; optionally use GPU to accelerate index building.
 # Before running, install: pip install faiss-cpu sentence-transformers pyyaml

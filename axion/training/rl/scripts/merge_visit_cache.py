@@ -1,9 +1,6 @@
 #!/usr/bin/env python3
 #
-# Modified by the Axion authors from the DeepResearch recipe: comments and
-# log messages translated to English, hard-coded site paths replaced with
-# environment variables or relative paths, and bug fixes. Unmodified files in
-# this directory carry their original headers.
+# Modified by the Axion authors for package paths, deployment settings and runtime fixes.
 #
 """Merge the per-node visit cache directories back into the read-only shared
 pool. Run once after training finishes.

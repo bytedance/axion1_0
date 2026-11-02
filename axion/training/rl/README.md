@@ -1,6 +1,6 @@
 # Reinforcement learning
 
-One RL recipe continues from the **Qwen3.5-122B-A10B Stage II checkpoint**.
+RL starts from the **Qwen3.5-122B-A10B Stage II checkpoint**.
 It implements Sections 3.3 and 5.2 and Table 5 of the
 [Axion report](https://axion1-0.github.io/paper/axion.pdf).
 Axion code is in this package; the asynchronous Megatron/vLLM backend is in
@@ -54,8 +54,8 @@ python -m pip install -e '.[training,rl-data]'
 Do not install the vendored `verl[vllm]` extra: its upstream version range
 predates the R3 support required here. The launcher uses the legacy mbridge
 backend and records installed versions and capability checks in the run output.
-These checks do not establish a complete compatible environment or validate a
-GPU run. The original final RL image has not been recovered.
+The original final RL image and its complete dependency versions are unavailable;
+prepare and validate the GPU stack on the deployment hardware.
 
 The current BSHD training path does not support the vendored fused LM-head
 projection, so that fusion is disabled. Memory use must be checked on the target
@@ -63,7 +63,7 @@ hardware. SFT environment instructions do not apply to RL.
 
 ## Prepare tasks
 
-The selector takes canonical tasks with `id`, `question`, `reference` and
+The selector takes tasks with `id`, `question`, `reference` and
 ordered intermediate `hops`. Numeric tolerances must be explicit, including
 zero for exact matching. See the schema and examples in
 [`prepare_rl.py`](../../datagen/stage2/pipeline/prepare_rl.py), also available
@@ -126,9 +126,23 @@ otherwise the script searches 9100–9199, excluding busy and reserved ports.
 `SANDBOX_RESERVED_PORTS` adds comma-separated deployment-specific exclusions.
 The service retains read-only mounts, network isolation and startup smoke checks.
 
-Start the Ray cluster in the prepared environment, then run from the repository
-root. Set `RL_UPDATES` to the desired positive, even number of optimizer updates;
-the paper does not report the final count.
+Start Ray with the same environment and package paths on each host:
+
+```bash
+# Head host; HEAD_IP must be reachable from the workers.
+ray start --head --node-ip-address="$HEAD_IP" --port=6379
+
+# Each additional host.
+ray start --address="$HEAD_IP:6379" --node-ip-address="$WORKER_IP"
+```
+
+Configure the Ray and NCCL network ports for the cluster. Explicit `NCCL_*`,
+`TORCH_NCCL_*` and `CUDA_DEVICE_MAX_CONNECTIONS` settings from the launch shell
+are forwarded to workers.
+
+Submit the training command once from the head host, from the repository root.
+Set `RL_UPDATES` to a positive, even number of optimizer updates; the paper
+does not report the final count.
 
 ```bash
 bash axion/training/rl/train.sh \
@@ -147,6 +161,29 @@ RL uses context parallelism 1 and microbatch 1 for the current per-session
 BSHD path. Each microbatch pads only its own session, avoiding batch-wide
 padding of short sessions to the longest trajectory.
 
+### Single-host allocation
+
+`trainer_nodes` and `rollout_nodes` count logical GPU groups. They may share a
+physical host, but their GPUs are reserved separately. For an eight-GPU host,
+these deployment fields allocate four GPUs to each pool:
+
+```yaml
+trainer_nodes: 1
+rollout_nodes: 1
+gpus_per_node: 4
+trainer_tensor_parallel_size: 2
+trainer_expert_parallel_size: 4
+rollout_tensor_parallel_size: 4
+```
+
+Start only the Ray head on that host and use the same training command. This
+layout needs at least 43 free Ray CPU resources for workers and coordinators;
+auxiliary model services require separate capacity. The launcher checks both
+aggregate capacity and per-host placement before starting workers. This does
+not measure GPU memory fit: the 122B model, gradients, KV cache and activations
+must fit the selected devices. The default multi-host layout remains 16 trainer
+and 40 rollout GPUs.
+
 `--output` must be empty. This launcher starts from Stage II; exact resumption
 of the asynchronous queue and in-flight generations is not supported. It saves
 checkpoints, the resolved config and `run_provenance.json`. The optional
@@ -154,16 +191,25 @@ checkpoints, the resolved config and `run_provenance.json`. The optional
 `updates * 24 * 100`, an execution guard rather than a paper hyperparameter.
 Exhausting it before the requested updates raises an error.
 
-## Validation and provenance
+## Checkpoints and inference
+
+Each saved policy version includes a Hugging Face checkpoint under
+`OUTPUT/global_step_<version>/actor/model/huggingface/`. Use that directory
+with the [inference instructions](../../evaluation/README.md#serve-a-checkpoint).
+Keep the full native checkpoint for training records.
+
+## Validation
 
 CPU tests cover reward and selection rules, trajectory-to-session conversion,
 padding masks, update/version accounting, routing alignment and real worker
-config construction. They do not validate distributed training, memory fit or
-benchmark reproduction. Full GPU validation remains required before claiming
-reproduction of the paper's results. To run the CPU checks in a separate test
-environment, install `.[test,rl-test]` and the vendored backend with `--no-deps`,
-then run `python -m pytest -q` from the repository root.
+config construction. GPU training, memory fit and paper benchmark results have not been revalidated
+for this release. Run the CPU checks in a separate test environment:
 
-Source revisions and the recovered reward implementation are recorded in
-[`provenance.json`](provenance.json). The implementation follows the paper;
-it is not a recovered copy of the final RL launch configuration. SFT is unchanged.
+```bash
+python -m pip install -e '.[test,rl-test]'
+python -m pip install --no-deps -e third_party/verl
+python -m pytest -q
+```
+
+Source revisions, reward provenance and unavailable runtime details are recorded
+in [`provenance.json`](provenance.json).

@@ -1,7 +1,8 @@
 # Stage II — Verifiable Tool-Use Data
 
-The paper reports 7,544 Stage II trajectories (~312M tokens). **This page is how to generate more of the same kind** — from the
-databases below, or from any other source you point a generator at.
+The paper uses 7,544 Stage II trajectories (~312M tokens). This pipeline
+constructs tool-dependent questions from public databases and verifies answers
+against the source records.
 
 A generator walks a public database: filter a pool, identify exactly one
 target, compute a derived quantity. The reference answer therefore comes from
@@ -9,10 +10,7 @@ the construction rather than from a model.
 
 The steps are:
 
-1. **Generate questions** — reuse a generator below, or write one against the
-   fields your own database happens to expose: every database supports its own
-   kinds of question, so the generator is written to fit the data rather than
-   the data forced into a template
+1. **Generate questions** with source-specific filters, selection rules and calculations
 2. **Rewrite the question text** so it reads naturally, and verify the rewrite
 3. **Drop the closed-book-solvable items** that need no retrieval
 4. **Sample an advanced model** in your own agent harness
@@ -61,8 +59,8 @@ The table is downloaded on first run; `--cache` keeps it for later runs.
 > Among all small airports in the Los Lagos region of Chile, which one has the
 > lowest published field elevation?
 
-No web page lists that, so the list has to be assembled before comparing. In
-half the items the deciding attribute lives in a second dataset.
+The solver assembles the candidate list before comparing values. Some items
+require a second dataset for the deciding attribute.
 
 ```bash
 # one source
@@ -139,8 +137,8 @@ checkpointed API client) are imported, not run directly.
 
 ### What step 4 needs
 
-Sampling is the only step that calls outside services, and the harness is not
-part of this repo. Ours read these from the environment:
+Use an external agent harness for sampling. Its retrieval and code-execution
+tools need the following service configuration:
 
 | Tool | Variable | What it is |
 |--|--|--|
@@ -201,16 +199,13 @@ for _ in range(max_tries):
           'tree': {...}, 'meta': {...}})
 ```
 
-Four rules, each learned by breaking it:
+Generator requirements:
 
 - **Not unique → discard the item.** Never "take the first".
 - **An extremum needs a clear margin** over the runner-up, or solvers whose
   source has slightly different values cannot decide.
-- **Pick pools whose membership is reproducible.** We once defined pools as
-  "airports with an ICAO code" — a real standard, but it is also issued to
-  airstrips and heliports that no public list covers, so our pool and the
-  solver's were different sets and the answers disagreed. An identifier being
-  standard does not make the set it defines reproducible.
+- **Use reproducible candidate pools.** Choose membership rules supported by a
+  complete public source, so construction and solving use the same records.
 - **Validate the generator independently.** Its answers are the reference
   answers, so a bug in it cannot be caught downstream. Compare against values
   shipped with the database, or compute the quantity a second way.

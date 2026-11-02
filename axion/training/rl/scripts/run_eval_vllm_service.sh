@@ -3,10 +3,7 @@
 # Run on a dedicated service node and supply its endpoints in the RL deployment
 # configuration for judge and summarizer requests.
 #
-# Modified by the Axion authors from the DeepResearch recipe: comments and
-# log messages translated to English, hard-coded site paths replaced with
-# environment variables or relative paths, and bug fixes. Unmodified files in
-# this directory carry their original headers.
+# Modified by the Axion authors for package paths, deployment settings and runtime fixes.
 #
 
 set -euo pipefail
@@ -19,6 +16,9 @@ TP_SIZES_RAW="${EVAL_VLLM_TENSOR_PARALLEL_SIZES:-}"
 MAX_MODEL_LEN="${EVAL_VLLM_MAX_MODEL_LEN:?EVAL_VLLM_MAX_MODEL_LEN must be set by the launcher}"
 GPU_MEMORY_UTILIZATION="${EVAL_VLLM_GPU_MEMORY_UTILIZATION:?EVAL_VLLM_GPU_MEMORY_UTILIZATION must be set by the launcher}"
 HOST="${EVAL_VLLM_HOST:-0.0.0.0}"
+PROBE_HOST="$HOST"
+case "$HOST" in 0.0.0.0) PROBE_HOST=127.0.0.1;; ::) PROBE_HOST=::1;; esac
+if [[ "$PROBE_HOST" == *:* && "$PROBE_HOST" != \[*\] ]]; then PROBE_HOST="[$PROBE_HOST]"; fi
 WAIT_RETRIES="${EVAL_VLLM_WAIT_RETRIES:-300}"
 WAIT_INTERVAL_SECONDS="${EVAL_VLLM_WAIT_INTERVAL_SECONDS:-2}"
 EXTRA_ARGS_RAW="${EVAL_VLLM_EXTRA_ARGS:-}"
@@ -97,13 +97,16 @@ wait_for_vllm_endpoint() {
   local host="$2"
   local port="$3"
   local pid="$4"
+  local served_name="$5"
+  local response
   local attempt=1
   while (( attempt <= WAIT_RETRIES )); do
     if ! kill -0 "$pid" 2>/dev/null; then
       echo "[ERROR] ${name} exited before becoming ready on ${host}:${port}" >&2
       return 1
     fi
-    if curl -s -f --max-time 5 "http://${host}:${port}/v1/models" >/dev/null 2>&1; then
+    if response=$(curl -s -f --noproxy '*' --max-time 5 "http://${host}:${port}/v1/models") &&
+       python -c 'import json,sys; data=json.load(sys.stdin); sys.exit(0 if any(model.get("id")==sys.argv[1] for model in data.get("data", [])) else 1)' "$served_name" <<< "$response" 2>/dev/null; then
       echo "[INFO] ${name} is ready on ${host}:${port}"
       return 0
     fi
@@ -118,14 +121,16 @@ PIDS=()
 cleanup() {
   local exit_code=$?
   for pid in "${PIDS[@]:-}"; do
-    if [[ -n "${pid}" ]] && kill -0 "$pid" 2>/dev/null; then
-      kill "$pid" 2>/dev/null || true
+    if [[ -n "${pid}" ]]; then
+      kill -- "-$pid" 2>/dev/null || true
     fi
   done
   wait 2>/dev/null || true
   return "$exit_code"
 }
-trap cleanup EXIT INT TERM
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 # Start mode: parallel (default) launches all instances at once, then waits for
 # them together - total startup ~= slowest single load instead of the sum. This
@@ -135,16 +140,19 @@ trap cleanup EXIT INT TERM
 # several model copies at once. Set EVAL_VLLM_PARALLEL_START=0 to go back to the
 # conservative serial (start -> wait -> next) behavior.
 PARALLEL_START="${EVAL_VLLM_PARALLEL_START:-1}"
-STARTED_PORTS=()
+START_RETRIES="${EVAL_VLLM_START_RETRIES:-3}"
+if [[ ! "$START_RETRIES" =~ ^[1-9][0-9]*$ ]]; then
+  echo "[ERROR] EVAL_VLLM_START_RETRIES must be a positive integer" >&2; exit 1
+fi
 
 #   idx0 61000-61199 … idx11 63200-63399
 VLLM_PORT_BASE="${VLLM_PORT:-61000}"
 VLLM_PORT_STRIDE="${VLLM_PORT_STRIDE:-200}"
 echo "[INFO] VLLM_PORT windows: base=${VLLM_PORT_BASE} stride=${VLLM_PORT_STRIDE} -> idx0 ${VLLM_PORT_BASE}-$((VLLM_PORT_BASE+VLLM_PORT_STRIDE-1)) … idx$(( ${#PORTS[@]} - 1 )) $((VLLM_PORT_BASE+(${#PORTS[@]}-1)*VLLM_PORT_STRIDE))-$((VLLM_PORT_BASE+${#PORTS[@]}*VLLM_PORT_STRIDE-1))"
 
-for idx in "${!PORTS[@]}"; do
-  port="${PORTS[$idx]}"
-  gpu_group="${GPU_GROUPS[$idx]}"
+start_instance() {
+  local idx="$1" attempt_i="$2"
+  local port="${PORTS[$idx]}" gpu_group="${GPU_GROUPS[$idx]}" tp_size
   if [[ -n "${TP_SIZES_RAW}" ]]; then
     tp_size="${TP_SIZES[$idx]}"
   else
@@ -155,61 +163,58 @@ for idx in "${!PORTS[@]}"; do
     exit 1
   fi
 
-  inst_model="${MODELS[$idx]}"
-  inst_served="${SERVED_NAMES[$idx]}"
-  inst_maxlen="${MAX_LENS[$idx]}"
-  inst_util="${GPU_UTILS[$idx]}"
-  start_retries="${EVAL_VLLM_START_RETRIES:-3}"
-  attempt_i=1
-  while :; do
-    inst_vllm_port=$(( VLLM_PORT_BASE + idx * VLLM_PORT_STRIDE + (attempt_i - 1) * 60 ))
-    echo "[INFO] Starting eval vLLM endpoint port=${port} gpus=${gpu_group} tp=${tp_size} model=${inst_model} served=${inst_served} max_len=${inst_maxlen} util=${inst_util} VLLM_PORT=${inst_vllm_port} (attempt ${attempt_i}/${start_retries})"
-    CUDA_VISIBLE_DEVICES="${gpu_group}" \
-    VLLM_PORT="${inst_vllm_port}" \
-      vllm serve "${inst_model}" \
-        --served-model-name "${inst_served}" \
-        --host "${HOST}" \
-        --port "${port}" \
-        --tensor-parallel-size "${tp_size}" \
-        --gpu-memory-utilization "${inst_util}" \
-        --max-model-len "${inst_maxlen}" \
-        "${EXTRA_ARGS[@]}" &
-    pid=$!
-    PIDS+=("$pid")
-    if [[ "${PARALLEL_START}" == "1" ]]; then
-      STARTED_PORTS+=("$port")
-      break
+  local inst_model="${MODELS[$idx]}" inst_served="${SERVED_NAMES[$idx]}"
+  local inst_maxlen="${MAX_LENS[$idx]}" inst_util="${GPU_UTILS[$idx]}"
+  local inst_vllm_port=$(( VLLM_PORT_BASE + idx * VLLM_PORT_STRIDE + (attempt_i - 1) * 60 ))
+  echo "[INFO] Starting eval vLLM endpoint port=${port} gpus=${gpu_group} tp=${tp_size} model=${inst_model} served=${inst_served} max_len=${inst_maxlen} util=${inst_util} VLLM_PORT=${inst_vllm_port} (attempt ${attempt_i}/${START_RETRIES})"
+  CUDA_VISIBLE_DEVICES="${gpu_group}" \
+  VLLM_PORT="${inst_vllm_port}" \
+    setsid vllm serve "${inst_model}" \
+      --served-model-name "${inst_served}" \
+      --host "${HOST}" \
+      --port "${port}" \
+      --tensor-parallel-size "${tp_size}" \
+      --gpu-memory-utilization "${inst_util}" \
+      --max-model-len "${inst_maxlen}" \
+      "${EXTRA_ARGS[@]}" &
+  PIDS[$idx]=$!
+}
+
+await_instance() {
+  local idx="$1" attempt_i=1
+  local port="${PORTS[$idx]}"
+  while ! wait_for_vllm_endpoint "eval_vllm_${port}" "$PROBE_HOST" "$port" "${PIDS[$idx]}" "${SERVED_NAMES[$idx]}"; do
+    if (( attempt_i >= START_RETRIES )); then
+      echo "[ERROR] eval_vllm_${port} failed to start ${START_RETRIES} times, giving up" >&2
+      return 1
     fi
-    if wait_for_vllm_endpoint "eval_vllm_${port}" "127.0.0.1" "${port}" "$pid"; then
-      STARTED_PORTS+=("$port")
-      break
-    fi
+    kill -9 -- "-${PIDS[$idx]}" 2>/dev/null || true
+    wait "${PIDS[$idx]}" 2>/dev/null || true
     attempt_i=$((attempt_i + 1))
-    if (( attempt_i > start_retries )); then
-      echo "[ERROR] eval_vllm_${port} failed to start ${start_retries} times, giving up" >&2
-      exit 1
-    fi
-    echo "[WARN] eval_vllm_${port} failed to start, cleaning up and retrying (next ${attempt_i}/${start_retries})" >&2
-    kill -9 "$pid" 2>/dev/null || true
-    pkill -9 -f -- "--port ${port} --tensor-parallel-size" 2>/dev/null || true
-    wait "$pid" 2>/dev/null || true
+    echo "[WARN] eval_vllm_${port} failed to start, retrying (${attempt_i}/${START_RETRIES})" >&2
     sleep 20
+    start_instance "$idx" "$attempt_i"
   done
+}
+
+for idx in "${!PORTS[@]}"; do
+  start_instance "$idx" 1
+  if [[ "$PARALLEL_START" != 1 ]]; then await_instance "$idx"; fi
 done
 
 if [[ "${PARALLEL_START}" == "1" ]]; then
   # Parallel: all instances are already launching; now wait for each to be ready.
-  echo "[INFO] Launched ${#STARTED_PORTS[@]} eval vLLM instances in parallel; waiting for all to become ready."
-  for i in "${!STARTED_PORTS[@]}"; do
-    wait_for_vllm_endpoint "eval_vllm_${STARTED_PORTS[$i]}" "127.0.0.1" "${STARTED_PORTS[$i]}" "${PIDS[$i]}"
+  echo "[INFO] Launched ${#PORTS[@]} eval vLLM instances in parallel; waiting for all to become ready."
+  for i in "${!PORTS[@]}"; do
+    await_instance "$i"
   done
 fi
 
 echo "[INFO] All eval vLLM endpoints are ready for served model ${SERVED_MODEL_NAME}."
 
 while true; do
-  wait -n
-  status=$?
+  if wait -n "${PIDS[@]}"; then status=0; else status=$?; fi
   echo "[ERROR] An eval vLLM process exited with status ${status}." >&2
+  (( status == 0 )) && status=1
   exit "$status"
 done

@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# Modified by the Axion authors: expand the execution-environment citation.
+
 import ast
 import faulthandler
 import json
@@ -608,8 +610,8 @@ def reliability_guard(maximum_memory_bytes=None):
     WARNING
     This function is NOT a security sandbox. Untrusted code, including, model-
     generated code, should not be blindly executed outside of one. See the
-    Codex paper for more information about OpenAI's code sandbox, and proceed
-    with caution.
+    paper "Evaluating Large Language Models Trained on Code"
+    (https://arxiv.org/abs/2107.03374) for the original execution environment.
     """
 
     if maximum_memory_bytes is not None:

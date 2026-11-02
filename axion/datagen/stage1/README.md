@@ -1,24 +1,14 @@
 # Stage I — Model-Aware Reasoning Data
 
-The paper reports 10,819 Stage I trajectories.
-**This page is how to generate more of the same kind** — against whatever base
-model you are about to train.
+The paper uses 10,819 Stage I trajectories. This pipeline constructs
+self-contained reasoning problems and adjusts their difficulty using the base
+model's solutions. Solvers use Python; search and webpage retrieval are excluded.
 
-Closed-book problems: the model gets Python and no search, so what is being
-trained is its own derivation and computation. Difficulty is calibrated against
-**your** base model rather than in the abstract: a problem it already solves is
-rewritten until that particular solution route stops working.
-
-The steps are:
-
-1. **Generate a harder question** from a seed problem, then solve and audit it
-   to fix a reference answer
-2. **Let your base model attempt each question once.** Wrong → the item is
-   already hard enough, keep it. Right → step 3
-3. **Rewrite the question against the route your base model actually took**,
-   then solve and audit again
-4. **Sample an advanced model** on the whole bank in a Python-only harness
-5. **Judge and filter** into SFT data
+1. Generate a harder question from a seed, then solve and verify its answer.
+2. Run the base model once. Keep questions it answers incorrectly.
+3. Rewrite correctly answered questions using the model's solution, then verify again.
+4. Collect advanced-model trajectories with Python tools.
+5. Judge the trajectories and convert accepted results to SFT messages.
 
 Run the commands below from `axion/datagen/stage1/`.
 
@@ -36,8 +26,7 @@ One real chain from the Stage I data, a seed from DeepMath:
 
 ```
 seed       lim (n!)^(1/n) / n  as n → ∞                               answer 1/e
-           A textbook limit. The base model has almost certainly seen it, so
-           the seed itself is never published or trained on — it is material.
+           The seed supplies the mathematical structure for the new question.
 
 step 1     F(z) = Σ_{n≥1} (n!/n^n) z^n.  For which integers m does F(m)
            converge?                                        answer {-2,-1,0,1,2}
@@ -66,9 +55,8 @@ python gen_from_seed.py --seed_bench seeds.jsonl --n 500 --out bank.jsonl \
 problem set with answers works — the example above uses a seed from
 [DeepMath-103K](https://huggingface.co/datasets/zwhe99/DeepMath-103K) (MIT).
 
-Seeds are material only: a seed never enters the output, and nothing derived
-from one keeps its wording. Check a new seed set against whatever you intend to
-evaluate on before using it.
+Seeds supply the underlying mathematical problem. Generated questions are
+rewritten rather than copied. Exclude evaluation questions from the seed set.
 
 For each seed the script runs three prompts (all in `prompts.py`):
 
@@ -84,15 +72,13 @@ For each seed the script runs three prompts (all in `prompts.py`):
   look for algebra slips, unjustified jumps, dropped cases, and misreadings.
   Only an item that passes the audit keeps its answer.
 
-Only an item the audit returns CORRECT on keeps its answer and goes on to
-step 2; anything else is dropped.
+Only items with an audit verdict of CORRECT proceed to step 2.
 
 ## 2. Split on what your base model can already do
 
 Run your base model once per question in a Python-only harness, then judge it.
-Items it gets **wrong** are already hard enough for it; keep them as they are.
-Items it gets **right** go to step 3, together with the solution text it
-produced — that text is what the attacker needs.
+Keep incorrect attempts as candidate hard problems. Pass correct attempts and
+their solution text to the rewriting step.
 
 ## 3. Rewrite against the route it took
 
@@ -110,9 +96,8 @@ if the audit returns CORRECT.
 ## 4–5. Sample, judge, assemble
 
 Sample an advanced model over the whole bank in the same Python-only harness.
-The harness is not part of this repo; the only outside service it needs here is
-a sandbox to run code in (ours took `E2B_API_KEY`, or a self-hosted endpoint in
-`SANDBOX_FUSION_ENDPOINT`). No search or browsing keys are involved, by design.
+Use an external harness with an E2B sandbox (`E2B_API_KEY`) or a self-hosted
+Sandbox Fusion endpoint (`SANDBOX_FUSION_ENDPOINT`).
 Judge each rollout against the reference answer — `prompts.judge()` does this
 with the same prompt we used — then flatten the accepted ones:
 
@@ -122,9 +107,7 @@ python ../utils/to_sft.py --results rollouts/ \
     --tools PythonInterpreter
 ```
 
-`--tools PythonInterpreter` is what enforces the closed-book setting: a
-trajectory that called a retrieval tool is rejected, so a harness configured
-for the wrong stage shows up here instead of silently contaminating the data.
+`--tools PythonInterpreter` rejects trajectories that used retrieval tools.
 
 A trajectory is kept only if the answer is judged correct, it ended on its own
 `<answer>` rather than at a turn or context limit, every assistant turn has a

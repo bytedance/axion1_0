@@ -1,4 +1,3 @@
-# Axion relocation: canonical package/resource paths; training behavior unchanged.
 # Copyright 2025 DeepResearch authors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,10 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# Modified by the Axion authors from the DeepResearch recipe: comments and
-# log messages translated to English, hard-coded site paths replaced with
-# environment variables or relative paths, and bug fixes. Unmodified files in
-# this directory carry their original headers.
+# Modified by the Axion authors for package paths, deployment settings and runtime fixes.
 #
 """
 HTTP service for DeepResearch scholar: SQLite cache + FAISS + Serper.

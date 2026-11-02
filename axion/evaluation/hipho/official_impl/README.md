@@ -1,7 +1,7 @@
 # HiPhO official grader, vendored
 
-HiPhO is graded by running the benchmark's own implementation, not a
-reimplementation of it. These three files are copied **unmodified** from
+These three files contain the official HiPhO grading implementation, copied
+unmodified from
 [open-compass/VLMEvalKit](https://github.com/open-compass/VLMEvalKit),
 `main` branch, retrieved 2026-09-30:
 
@@ -14,12 +14,9 @@ reimplementation of it. These three files are copied **unmodified** from
 `hipho_verifier.py` carries an Apache-2.0 header (Copyright 2025 Garena Online
 Private Limited). VLMEvalKit is Apache-2.0.
 
-`shim.py` is the only file here that is ours. It fakes the `vlmeval` modules
-those three import, so they load outside VLMEvalKit, and builds a
-`HiPhODataset` instance usable for grading without running `__init__` (which
-would download the dataset and build a dataframe). Every faked symbol that the
-grading path does not need raises if called, so execution cannot silently drift
-onto a different code path.
+`shim.py` supplies the small subset of VLMEvalKit interfaces used by the
+grader, so these files can run without installing the full toolkit. Unsupported
+interfaces raise an error.
 
 ## Dependencies
 
@@ -31,8 +28,8 @@ the [evaluation guide](../../README.md).
 ## Refreshing
 
 Copy the three files again from the same upstream paths and record the new
-retrieval date here. Do not edit them: `shim.py` adapts to them, not the other
-way round. If an upstream change breaks the shim, fix the shim.
+retrieval date here. Keep upstream files unmodified and update `shim.py` for
+interface changes.
 
 To check that the grader still loads:
 

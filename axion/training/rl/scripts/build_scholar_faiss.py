@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Axion relocation: canonical package/resource paths; training behavior unchanged.
+# Modified by the Axion authors for package and resource paths.
 """
 Merge scholar SQLite shards and build the FAISS index in one pass.
 After that, online serving only needs append writes.

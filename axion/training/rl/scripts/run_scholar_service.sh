@@ -1,14 +1,10 @@
 #!/usr/bin/env bash
-# Axion relocation: canonical package/resource paths; training behavior unchanged.
 # Start the Scholar HTTP service on a separate machine, with embeddings on GPU and FAISS on CPU.
 # Run directly. By default, it reads config/tools.yaml in this repo, including faiss_similarity_threshold and Serper settings.
 # Override config: export SCHOLAR_SERVICE_CONFIG=/other/path/tools.yaml
 # Override port: export SCHOLAR_SERVICE_PORT=8001
 #
-# Modified by the Axion authors from the DeepResearch recipe: comments and
-# log messages translated to English, hard-coded site paths replaced with
-# environment variables or relative paths, and bug fixes. Unmodified files in
-# this directory carry their original headers.
+# Modified by the Axion authors for package paths, deployment settings and runtime fixes.
 #
 
 set -e

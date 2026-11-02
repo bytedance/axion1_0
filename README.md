@@ -78,9 +78,6 @@ Model weights are coming soon.
 
 ## 3. Training Recipe
 
-Data construction establishes questions and reference answers before collecting
-solution trajectories. Only verified trajectories are retained for SFT.
-
 <p align="center">
   <a href="assets/data-construction.svg">
     <img src="assets/data-construction.svg" width="100%" alt="Two-stage data construction: model-aware strengthening of self-contained reasoning problems, followed by deterministic construction and verification of tool-dependent tasks">

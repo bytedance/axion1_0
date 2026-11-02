@@ -26,8 +26,8 @@
   </p>
   <p>
     <strong>Correspondence:</strong>
-    <a href="mailto:yuqi.jia@duke.edu">Yuqi Jia</a> ·
-    <a href="mailto:tianyunjie96@gmail.com">Yunjie Tian</a>
+    <a href="mailto:yuqi.jia@duke.edu">yuqi.jia@duke.edu</a> ·
+    <a href="mailto:tianyunjie96@gmail.com">tianyunjie96@gmail.com</a>
   </p>
 
   <p>

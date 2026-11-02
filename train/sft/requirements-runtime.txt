@@ -1,0 +1,8 @@
+# Observed versions from the selected run/export records; this is not a complete GPU stack lock.
+megatron-core==0.17.1
+mcore-bridge==1.4.3
+transformers==5.10.4
+
+# Required by the vendored Qwen3.5 loader; exact original versions were not recovered.
+qwen-vl-utils>=0.0.14
+decord

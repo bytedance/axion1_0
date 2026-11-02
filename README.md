@@ -40,7 +40,7 @@
   feedback from the base model. Tasks requiring tools are constructed from
   public data sources with programmatically determined reference answers.
 - **Open training code.** The repository includes data generation and
-  filtering, prompts, SFT and RL recipes, and benchmark preparation and grading.
+  filtering, prompts, a two-stage SFT recipe, RL source, and benchmark preparation and grading.
 
 ## Results
 
@@ -74,7 +74,7 @@ scores are from official reports. — denotes an unreported result.
 | Axion 1.0-35B | Qwen3.6-35B-A3B | 35B / 3B |
 | Axion 1.0-122B | Qwen3.5-122B-A10B | 122B / 10B |
 
-Both models use the full SFT and RL recipe. The paper also reports 4B and 9B
+Both models in the paper use SFT and RL. The paper also reports 4B and 9B
 variants trained with SFT only.
 
 Model weights and training datasets are listed as *Coming soon* on the
@@ -134,41 +134,46 @@ Two-stage SFT costs reported in Section 5.1:
 | Axion 1.0-35B | 32 | 1h 02m | 1h 46m | ≈90 |
 | Axion 1.0-122B | 32 | 3h 32m | 3h 58m | 240 |
 
-These costs are for the paper's ms-swift / Megatron-FSDP implementation.
-The bundled [LLaMA-Factory SFT configurations](train/sft/README.md) use the
-Megatron backend with a 98,304-token sequence limit.
+These costs are reported in the paper. The released 122B SFT recipe uses
+32 GPUs, a 128K context window, and a global batch of 8. Its saved training
+arguments record micro-batch size 1; Section 5.1 lists 2. The released
+[SFT recipe](train/sft/README.md) preserves the saved training arguments.
 
 ## Getting Started
+
+Install the data and evaluation tools in their own Python 3.11+ environment:
 
 ```bash
 git clone https://github.com/bytedance/axion1_0.git
 cd axion1_0
-
-conda create -n axion python=3.12
-conda activate axion
-
-pip install --index-url https://download.pytorch.org/whl/cu129 \
-    torch==2.10.0 torchvision==0.25.0 torchaudio==2.10.0
-pip install -r requirements.txt
-
-pip install -e train/verl                 # RL
-pip install -e train/sft/LlamaFactory     # SFT
+python -m pip install -e ".[data,evaluation]"
 ```
 
-Additional CUDA extensions and service credentials are described in the
-[training guide](train/README.md). Build `transformer_engine` against your
-CUDA and PyTorch installation. HiPhO grading requires a separate dependency
-prefix; see the [evaluation guide](eval/README.md).
+Training uses separate SFT and RL environments. Follow the
+[training guide](train/README.md) for their source, runtime requirements,
+and available recipes.
+
+```text
+axion/
+  datagen/       Stage I and Stage II data construction
+  evaluation/    Benchmark preparation and grading
+train/
+  sft/           Two-stage Megatron-FSDP recipe and runtime patches
+  swift/         SFT framework
+  rl/            RL source status
+  verl/          RL framework and agent tools
+tests/           Data and command regression checks
+```
 
 ### Documentation
 
 | Guide | Contents |
 |:---|:---|
-| [Stage I data](datagen/stage1/README.md) | Problem generation, rewriting, answer verification, and trajectory filtering |
-| [Stage II data](datagen/stage2/README.md) | Database generators, question filtering, scoring, and trajectory processing |
-| [SFT](train/sft/README.md) | Data validation and two-stage training configurations |
-| [RL](train/README.md) | 35B/122B recipes, tool services, and asynchronous GRPO |
-| [Evaluation](eval/README.md) | Dataset preparation and grading for FrontierScience, HiPhO, HLE-130, and SEAL-0 |
+| [Stage I data](axion/datagen/stage1/README.md) | Problem generation, rewriting, answer verification, and trajectory filtering |
+| [Stage II data](axion/datagen/stage2/README.md) | Database generators, question filtering, scoring, and trajectory processing |
+| [SFT](train/sft/README.md) | Runtime setup, data requirements, two-stage training, and checkpoint export |
+| [RL](train/rl/README.md) | Framework source, agent tools, and reproduction status |
+| [Evaluation](axion/evaluation/README.md) | Dataset preparation and grading for FrontierScience, HiPhO, HLE-130, and SEAL-0 |
 
 Evaluation scripts prepare datasets and grade rollouts collected with an
 external agent harness. The evaluation guide documents the required format.

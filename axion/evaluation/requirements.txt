@@ -1,0 +1,14 @@
+# Extra dependencies for the HiPhO grader only.
+#
+# The vendored official grader needs antlr4 4.13.x, while training frameworks
+# can require an incompatible ANTLR runtime. Install these into a separate prefix and put
+# it on PYTHONPATH when grading HiPhO:
+#
+#   pip install --target .hipho_deps -r requirements.txt
+#   PYTHONPATH=$PWD/.hipho_deps python hipho/judge.py ...
+#
+# Install the evaluation extra from ../../pyproject.toml first.
+
+math_verify==0.9.0
+latex2sympy2_extended==1.11.0
+antlr4-python3-runtime==4.13.2

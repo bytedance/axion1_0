@@ -1,136 +1,113 @@
 # SFT
 
-LlamaFactory with the Megatron (mca) backend.
+This is the released two-stage Qwen3.5-122B-A10B recipe: **32 GPUs (4 × 8),
+131072-token packing, TP1 / PP1 / EP8 / CP4, microbatch 1, global batch 8**.
+Both stages use full BF16 SFT, three epochs, constant LR 3e-6, and assistant-only
+loss across all turns. Stage1 saves every 160 steps; stage2 saves at its final
+step (interval 1000000). Optimizer and RNG states are saved; retention is 100.
+The reference exports are stage1 iteration 795 and stage2 iteration 894.
 
-Training runs in two stages: stage 1 from the base model on the stage-1
-trajectories, stage 2 continuing from the stage-1 checkpoint on the stage-2
-trajectories. The RL recipe starts from the stage-2 checkpoint.
+## Environment
 
-```
-train/sft/
-  LlamaFactory/      vendored upstream, with one patch (see below)
-  sft_stage1.yaml    stage 1 config
-  sft_stage2.yaml    stage 2 config
-  check_data.py      verifies the data survives the pipeline
-  data/              dataset_info.json; put the data here
-```
+Use a dedicated **Python 3.12** environment with a compatible GPU stack already
+installed: PyTorch, CUDA, TransformerEngine, FlashAttention and FLA. The complete
+versions of that original stack were not recovered. The available records show
+Megatron-core 0.17.1, mcore-bridge 1.4.3 and Transformers 5.10.4 at export; the
+requirements file pins these observed versions, not a complete environment lock.
+It also includes the source-declared Qwen3.5 loader dependencies
+`qwen-vl-utils>=0.0.14` and `decord`; their original versions were not recovered.
 
-## Install
-
-```bash
-pip install -r requirements.txt            # from the repository root
-pip install -e train/sft/LlamaFactory
-```
-
-The environment is newer than the versions LlamaFactory declares, so set
-`DISABLE_VERSION_CHECK=1` when running it.
-
-### The one patch
-
-`LlamaFactory/src/llamafactory/train/mca/workflow.py` adds
-`_pad_to_tp_multiple_wrapper`, which pads each collated batch up to a multiple
-of the tensor-parallel size.
-
-It is needed because the multimodal collator appends a placeholder image to a
-batch that contains none, which this text-only data does on every step. The
-extra visual tokens make a batch that already fills `cutoff_len` overflow to an
-odd length, and `sequence_parallel` then fails an assertion that the sequence
-divides evenly across ranks. Without the patch, training crashes as soon as a
-batch is long enough.
-
-## Prepare the data
-
-Put the two trajectory sets at `train/sft/data/stage1.jsonl` and
-`train/sft/data/stage2.jsonl`, one conversation per line:
-
-```json
-{"messages": [{"role": "system", "content": "..."},
-              {"role": "user", "content": "..."},
-              {"role": "assistant", "content": "..."}]}
-```
-
-Each line must hold exactly one conversation, with a single leading system
-message and strict user/assistant alternation after it. LlamaFactory drops a
-row that has a second system message mid-conversation, or two messages with
-the same role in a row.
-
-`datagen/` writes this format. The names `stage1` and `stage2` are registered
-in `train/sft/data/dataset_info.json`; change them there and in the configs if
-you use different filenames.
-
-Then verify that nothing is dropped:
+From the repository root, on every training node:
 
 ```bash
-USE_MCA=1 DISABLE_VERSION_CHECK=1 torchrun --nproc_per_node=1 \
-    train/sft/check_data.py \
-    --model /path/to/base/model \
-    --data-dir train/sft/data \
-    --datasets stage1 stage2
+pip install -r train/swift/requirements.txt -r train/sft/requirements-runtime.txt
+pip install --no-deps -e train/swift
+python train/sft/runtime.py --apply
 ```
 
-It compares the number of conversations the pipeline yields against the number
-of lines in the input and exits non-zero on any mismatch. A conversation lost
-to an invalid role tag, or to being longer than `cutoff_len`, is otherwise
-reported only as a warning that is easy to miss in the training log.
+The last command applies the original GDN CP backport to the two recognized
+Megatron-core files in this environment. It checks file hashes, is idempotent,
+and uses no sudo. The environment must be writable by its owner. Do not install
+the MCore `training` extra: its Transformers constraint conflicts with the
+recorded export stack. The verified 0.17.1 wheel already contains the needed
+`megatron.training.checkpointing` module.
+
+Prepare CUDA libraries and NCCL networking for your cluster on every node. The
+launcher retains `MS_SWIFT_SKIP_TE_PRELOAD=1`, the original conditional CUDA 13
+cuBLAS preload (`CUBLAS_LIB_DIR` can specify its directory), and CUDA connections
+1 before Swift initializes FSDP and changes it to 8. It clears the original
+profiling/cache variables. Scheduler-specific Ethernet/RDMA defaults are omitted;
+configure your network outside this launcher.
+
+Swift includes the paired CP/FSDP guard change, eight-thread synchronous DCP
+writer and single-process export fix. **Lifting the Swift guard alone is not
+sufficient**; the launcher checks the full MCore backport before training/export.
+The imported `agent_sft` source is not proven identical to the original mutable
+`bt_sft` training image. [provenance.json](provenance.json) records this distinction.
+
+## Data
+
+Each JSONL row needs `messages`, `total_tokens` measured by the actual Swift
+training template, and `visual_tokens: 0`. Data must already be filtered to 128K.
+Unannotated `to_sft` output is insufficient: the source's metadata path may
+disable packing or retain overlength rows.
+
+For new inputs, use the training-template encoder with the same base model:
+
+```bash
+python train/sft/tools_template_lengths.py raw.jsonl annotated.jsonl \
+  --model /path/to/Qwen3.5-122B-A10B --cap 131072 --workers 16
+```
+
+The reference inputs are not redistributed. Their hashes and counts are in
+[provenance.json](provenance.json): stage1 has 9840 conversations and 277397139
+template tokens; stage2 has 7544 conversations and 312161019 template tokens.
+Use the corresponding annotated inputs to reproduce those runs. The launcher
+checks every row's length metadata; this does not prove its token count is exact.
 
 ## Train
 
+Run on all four nodes, setting `RANK` to 0, 1, 2, 3 and `HEAD` to the head-node host.
+Use the same model/data files and output path visible to every rank. Checkpoint
+storage must be shared and writable; the private NAS background uploader is not
+included. A native checkpoint can be around 1.1 TB, so plan space for retention.
+
 ```bash
-USE_MCA=1 CUDA_DEVICE_MAX_CONNECTIONS=1 DISABLE_VERSION_CHECK=1 \
-    llamafactory-cli train train/sft/sft_stage1.yaml
-USE_MCA=1 CUDA_DEVICE_MAX_CONNECTIONS=1 DISABLE_VERSION_CHECK=1 \
-    llamafactory-cli train train/sft/sft_stage2.yaml
+bash train/sft/train.sh stage1 \
+  --model /path/to/Qwen3.5-122B-A10B \
+  --dataset /path/to/stage1-annotated.jsonl --output /shared/sft-stage1 \
+  --master-addr "$HEAD" --node-rank "$RANK"
+
+bash train/sft/train.sh stage2 \
+  --model /path/to/Qwen3.5-122B-A10B \
+  --dataset /path/to/stage2-annotated.jsonl --output /shared/sft-stage2 \
+  --mcore-model /shared/sft-stage1/checkpoint-795 \
+  --master-addr "$HEAD" --node-rank "$RANK"
 ```
 
-Set `model_name_or_path`, `dataset` and `output_dir` in each config first. For
-stage 2, `model_name_or_path` is a stage-1 checkpoint directory in the mca
-format, not the `_hf` export.
+Add `--dry-run` to print the complete command/config without loading the model,
+patching an environment or launching workers. `common.yaml` is shared by both
+stages. Stage2 accepts a native `fsdp_dtensor` checkpoint, **not an HF export**;
+`finetune=true` loads weights and starts a new optimizer/schedule. This entrypoint
+does not resume an interrupted stage's optimizer.
 
-### Scaling
+## Export
 
-`expert_model_parallel_size` must divide `DP * TP`, where
-`DP = world_size / (tensor_model_parallel_size * pipeline_model_parallel_size)`.
-With the shipped `TP=2, PP=1, EP=8`, the world size must be a multiple of 8.
+Use the prepared SFT environment, one GPU and enough host RAM for the full model
+(the original exporter estimated about 245 GB just for BF16 parameters). Export
+outside the training directory:
 
-Three settings are not free to change:
+```bash
+bash train/sft/train.sh export \
+  --model /path/to/Qwen3.5-122B-A10B \
+  --mcore-model /shared/sft-stage2/checkpoint-894 --output /shared/sft-stage2-hf
+```
 
-- `sequence_parallel: true` is required. This model has a large vocabulary and
-  cross-entropy materialises the logits in fp32; at this sequence length they
-  do not fit on one device.
-- Keep `tensor_model_parallel_size` at 2. `num_query_groups` is 2, so a larger
-  TP takes the compensation path in megatron-core's attention, which re-slices
-  the query heads but not the output gate. The gate then has more heads than
-  the attention output and the reshape in `_apply_output_gate` raises.
-- `context_parallel` must stay off. Most layers are gated_delta_net, which
-  requires `context_parallel_size == 1`.
+This uses DCP-direct export with `MS_SWIFT_EXPORT_NO_FSDP=1`, resets parallelism
+and sequence parallelism, and performs no approximate vocabulary repair.
+The explicit `--model` takes precedence over a model path stored in the native
+checkpoint and over inherited `BASE_MODEL`, so checkpoints can move between hosts.
 
-Together those cap `cutoff_len`: the sequence can only be split along TP, TP
-cannot exceed 2, and the fp32 logits grow linearly with the sequence. 98304 is
-the longest that fits. Adding GPUs does not help, because that raises DP and
-leaves the per-device sequence length unchanged.
-
-`optimizer_cpu_offload` is off. The expert optimizer state shards across
-`DP * TP / EP` ranks, which is enough here. Turn it on if it does not fit; it
-costs throughput.
-
-### Two settings that silently change what is trained
-
-| Setting | Keep | If changed |
-|---|---|---|
-| `enable_thinking` | `true` (default) | `false` strips every `<think>` from the data |
-| `mask_history` | `false` (default) | `true` trains only the last turn of each conversation |
-
-### Packing
-
-Stage 2 sets `packing: true`; stage 1 does not. With expert parallelism the
-collator pads every batch to `cutoff_len`, so without packing most of each
-batch is padding.
-
-Use plain packing, not `neat_packing` — the argument parser rejects
-`neat_packing` on transformers >= 4.53, and it is not needed here because
-`position_ids` restart at each sample, which is what flash-attention uses to
-keep samples from attending across the boundary.
-
-Packing produces fewer, longer sequences, so a given number of epochs runs
-fewer optimizer steps than an unpacked run. Raise
-`gradient_accumulation_steps` if you want the step count to match.
+Publication checks cover config parity with saved args, runtime patch hashes,
+packaging and CPU dry runs. Distributed training, export numerical parity and
+paper metrics have not been rerun in this workspace.

@@ -1,0 +1,138 @@
+{
+  "selected_run": {
+    "world_size": 32,
+    "max_length": 131072,
+    "context_parallel_size": 4,
+    "micro_batch_size": 1,
+    "global_batch_size": 8
+  },
+  "stages": {
+    "stage1": {
+      "checkpoint": "qwen35_122b_agentic_s1_q122_128k_32gpu_cp4mbs1_iter795_hf",
+      "args_sha256": "bdbcf1d69f2b0d3f1ca7bd3f55af99eebd67f9623098218db23f8f91b191f2c1",
+      "config_sha256": "ef0227a9206bf9d4900d077bb16af00dc37feb6fa46e9aa081df083e85a79595",
+      "dataset": {
+        "filename": "q122_nosearch_tpl_le128k.jsonl",
+        "sha256": "c86241fe702dec52b8a01570a4b3bdfec304f7aab4ee41f372731f9ba4af29c1",
+        "bytes": 746371999,
+        "conversations": 9840,
+        "template_tokens": 277397139,
+        "max_template_tokens": 130875,
+        "invalid_length_metadata": 0
+      }
+    },
+    "stage2": {
+      "checkpoint": "qwen35_122b_s2_x5s2_from_s1iter795_128k_32gpu_cp4mbs1_iter894_hf",
+      "args_sha256": "74759f35ced6355100cada573068ee8e0147a7d1ea836766716bee7331c61bed",
+      "config_sha256": "ef0227a9206bf9d4900d077bb16af00dc37feb6fa46e9aa081df083e85a79595",
+      "dataset": {
+        "filename": "x5_s2_tpl_le128k.jsonl",
+        "sha256": "f7149d423dae5977f6bf02a9d286bcd0112c34ae6a56f79fcdac60894c1989c5",
+        "bytes": 915522178,
+        "conversations": 7544,
+        "template_tokens": 312161019,
+        "max_template_tokens": 130990,
+        "invalid_length_metadata": 0
+      }
+    }
+  },
+  "runtime_evidence": {
+    "python": "3.12",
+    "megatron_core": "0.17.1",
+    "mcore_bridge": "1.4.3",
+    "transformers_export_config": "5.10.4",
+    "swift_version": "4.4.0.dev0",
+    "exact_training_image_commit": null,
+    "complete_environment_lock": false
+  },
+  "recovered_sources": {
+    "train_122b_agentic.sh": {
+      "sha256": "12966d373e2f18d673160c17bf4ffd6b635a29f4082d51fd365e2881a6863576"
+    },
+    "patches/make_overlay.sh": {
+      "sha256": "ddf29b7f4a6ea7618b986e1afae433eec7bb605749dba52178a04e66f958b090"
+    },
+    "export_ckpt_to_hf.sh": {
+      "sha256": "e747036f74eaee3f67208c0c411eeac6623eb26a48272b20f4da88049cc50b49"
+    },
+    "tools_template_lengths.py": {
+      "sha256": "44df5e33e66d285c493a99bc0f074b6f981277ba9119c18b8a2ba81928155735"
+    }
+  },
+  "gdn_cp_patch": {
+    "upstream_project": "NVIDIA/Megatron-LM",
+    "upstream_pull_request": 2642,
+    "sha256": "3aa5a6266dd543fa50dd86e370bee25b38737801873736bacaef9ed5789d6cf0",
+    "verified_public_artifacts": {
+      "megatron_core-0.17.1-cp312-cp312-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl": "6dd0826489ee70a791e38612b25e914c4a18b0b074f2282353f235ee96273cf2",
+      "mcore_bridge-1.4.3-py3-none-any.whl": "f353377f12656b685694096384ddcc9ef8f6017eb8eb7f07445472b879d4afa1"
+    },
+    "source_hashes": {
+      "megatron/core/ssm/gated_delta_net.py": {
+        "before_sha256": "1ebe56125438984e3a0e0b4d5a89ea7ab45366e4a0fd757021b54523f3647875",
+        "after_sha256": "b456afde1aefc12cea991d3db7e5b9cf6d444dbaa56fc9496cb5812cce6eaee0"
+      },
+      "megatron/core/transformer/transformer_config.py": {
+        "before_sha256": "f05bfdabd18188bfb0c33b4fda9f205798addc8ea001ee8e7dde6c5528ce0802",
+        "after_sha256": "235c54ce7cd705789fffb587c13e9b42e4a9e8dd65f8e5d2c85fb21548cd3da6"
+      }
+    }
+  },
+  "validation": "CPU/static publication checks only; no distributed GPU training has been rerun.",
+  "length_tool_adaptations": [
+    "Remove private sys.path override; require the installed vendored Swift package.",
+    "Require an explicit model directory; change cap default from98304 to131072.",
+    "Preserve original train-template encode, filtering and metadata-writing logic."
+  ],
+  "source_distinction": {
+    "imported_source": {
+      "project": "tns/swift",
+      "branch": "agent_sft",
+      "commit": "06686330164c1221d069d774a0dcb5092a8b2260"
+    },
+    "original_training_job_branch": "bt_sft",
+    "original_training_image_commit": null,
+    "original_training_image_digest": null,
+    "job_configuration_uses_latest_commit": true,
+    "comparison_only_current_bt_sft_head": "ab8b8ec214c9331359218e34d3aa0a8653eaacc2",
+    "not_equivalent_to_original_image": true,
+    "differences": {
+      "swift_files_differing": 18,
+      "qwen35_text_template_normalization": "identical",
+      "template_base_opt_in_list_content": "Only agent_sft has this opt-in behavior; launcher forces its recorded default off.",
+      "tp_pp_fsdp_fixes": "bt_sft adds TP-replicated SwiGLU handling and PP mesh/output fixes; the selected topology is TP1/PP1. These changes were not imported.",
+      "fla_autotune": "bt_sft adds default-enabled autotune pinning that may affect runtime or numerical behavior. Its presence in the original image is unproven and it was not imported.",
+      "other_differences": "Private Lance/Iceberg/HDFS/video storage additions are not imported."
+    }
+  },
+  "publication_adaptations": [
+    "Replace private filesystem and scheduler assumptions with explicit local model, annotated data, checkpoint and output arguments.",
+    "Use the saved 32-GPU/128K/GBS8/MBS1 stage settings instead of stale launcher defaults.",
+    "Apply the recovered Swift CP guard, DCP writer and export sequence-parallel changes, paired with the unchanged MCore GDN CP backport; additionally preserve an explicit export model path during checkpoint-argument loading.",
+    "Use shared checkpoint storage directly; omit the private background checkpoint syncer and GPU keepalive work.",
+    "Validate runtime source hashes before launch; no training-time sudo or global environment patching.",
+    "Make export --model authoritative before model initialization and set BASE_MODEL to the same validated local directory; retain other checkpoint configuration fields.",
+    "Declare and preflight the vendored Qwen3.5 loader requirements qwen-vl-utils>=0.0.14 and decord. Their original installed versions are unknown.",
+    "Retain source launcher TE preload skip, conditional CUDA13 cuBLAS preload, HTTP pool and GPU visibility defaults, and cache/profiling cleanup. Initialize CUDA_DEVICE_MAX_CONNECTIONS=1 so the existing FSDP initialization changes it to8 in its original order.",
+    "Leave NCCL network interface and RDMA selection to the deployment instead of retaining scheduler-specific eth0/GID3 defaults."
+  ],
+  "length_tool_published_sha256": "13c6912ac8c61045565707586ef63488d2359da14ccbd01c00d27fb5b50efbc1",
+  "tokenizer_provenance": {
+    "qwen35_122b_agentic_s1_q122_128k_32gpu_cp4mbs1_iter795_hf": {
+      "chat_template.jinja": "a4aee8afcf2e0711942cf848899be66016f8d14a889ff9ede07bca099c28f715",
+      "tokenizer_config.json": "792fa3f0cb88b111e54ef3134c873531008c4df471d108da17903426e308aa7b",
+      "tokenizer.json": "06b9509352d2af50381ab2247e083b80d32d5c0aba91c272ca9ff729b6a0e523",
+      "config.json": "ef0227a9206bf9d4900d077bb16af00dc37feb6fa46e9aa081df083e85a79595"
+    },
+    "qwen35_122b_s2_x5s2_from_s1iter795_128k_32gpu_cp4mbs1_iter894_hf": {
+      "chat_template.jinja": "a4aee8afcf2e0711942cf848899be66016f8d14a889ff9ede07bca099c28f715",
+      "tokenizer_config.json": "792fa3f0cb88b111e54ef3134c873531008c4df471d108da17903426e308aa7b",
+      "tokenizer.json": "06b9509352d2af50381ab2247e083b80d32d5c0aba91c272ca9ff729b6a0e523",
+      "config.json": "ef0227a9206bf9d4900d077bb16af00dc37feb6fa46e9aa081df083e85a79595"
+    }
+  },
+  "source_declared_model_dependencies": {
+    "qwen-vl-utils": ">=0.0.14",
+    "decord": "required; original version unknown"
+  }
+}

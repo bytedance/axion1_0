@@ -10,6 +10,8 @@ __pycache__/
 .cursor/
 .cursorrules
 .agent/
+.agents/
+.codex/
 .aider*
 .vscode/
 .idea/
@@ -29,8 +31,6 @@ Thumbs.db
 .venv/
 venv/
 .env
-# eval/README.md installs the HiPhO grader's dependencies into this prefix
-eval/.hipho_deps/
 
 # Data, checkpoints and run output.
 # These are anchored with a leading slash on purpose: an unanchored "data/"
@@ -51,3 +51,13 @@ train/sft/data/*
 eval/*/*.jsonl
 eval/hle/_hle_raw/
 eval/.hipho_deps/
+
+# Package builds and local checks
+/build/
+/dist/
+.pytest_cache/
+
+# Canonical evaluation paths (eval/ remains a compatibility alias)
+axion/evaluation/.hipho_deps/
+axion/evaluation/*/*.jsonl
+axion/evaluation/hle/_hle_raw/

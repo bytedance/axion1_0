@@ -1,0 +1,2 @@
+# Preserve the original patch bytes, including blank context lines.
+train/sft/patches/*.diff -whitespace

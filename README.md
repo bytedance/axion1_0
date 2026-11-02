@@ -137,32 +137,41 @@ Two-stage SFT costs reported in Section 5.1:
 These costs are reported in the paper. The released 122B SFT recipe uses
 32 GPUs, a 128K context window, and a global batch of 8. Its saved training
 arguments record micro-batch size 1; Section 5.1 lists 2. The released
-[SFT recipe](train/sft/README.md) preserves the saved training arguments.
+[SFT recipe](axion/training/sft/README.md) preserves the saved training arguments.
 
 ## Getting Started
 
-Install the data and evaluation tools in their own Python 3.11+ environment:
+Clone the repository and follow the [training guide](axion/training/README.md)
+for environment setup, two-stage SFT and checkpoint export. SFT uses Swift with
+Megatron-FSDP; RL uses verl. They implement successive stages of the same
+training pipeline.
 
 ```bash
 git clone https://github.com/bytedance/axion1_0.git
 cd axion1_0
-python -m pip install -e ".[data,evaluation]"
 ```
-
-Training uses separate SFT and RL environments. Follow the
-[training guide](train/README.md) for their source, runtime requirements,
-and available recipes.
 
 ```text
 axion/
+  training/
+    sft/         Two-stage SFT, runtime patches and checkpoint export
+    rl/          Agent rollouts, rewards, tools and RL configuration
   datagen/       Stage I and Stage II data construction
   evaluation/    Benchmark preparation and grading
-train/
-  sft/           Two-stage Megatron-FSDP recipe and runtime patches
-  swift/         SFT framework
-  rl/            RL source status
-  verl/          RL framework and agent tools
-tests/           Data and command regression checks
+third_party/
+  swift/         SFT backend
+  verl/          RL backend
+tests/           Regression and packaging checks
+```
+
+The released SFT guide contains one 122B recipe. RL source is included;
+the complete runtime and launch configuration for the paper's final RL runs
+have not been recovered.
+
+For data construction and evaluation, use a separate Python 3.11+ environment:
+
+```bash
+python -m pip install -e ".[data,evaluation]"
 ```
 
 ### Documentation
@@ -171,8 +180,8 @@ tests/           Data and command regression checks
 |:---|:---|
 | [Stage I data](axion/datagen/stage1/README.md) | Problem generation, rewriting, answer verification, and trajectory filtering |
 | [Stage II data](axion/datagen/stage2/README.md) | Database generators, question filtering, scoring, and trajectory processing |
-| [SFT](train/sft/README.md) | Runtime setup, data requirements, two-stage training, and checkpoint export |
-| [RL](train/rl/README.md) | Framework source, agent tools, and reproduction status |
+| [SFT](axion/training/sft/README.md) | Runtime setup, data requirements, two-stage training, and checkpoint export |
+| [RL](axion/training/rl/README.md) | Framework source, agent tools, and reproduction status |
 | [Evaluation](axion/evaluation/README.md) | Dataset preparation and grading for FrontierScience, HiPhO, HLE-130, and SEAL-0 |
 
 Evaluation scripts prepare datasets and grade rollouts collected with an

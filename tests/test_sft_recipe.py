@@ -16,7 +16,7 @@ import unittest
 from unittest import mock
 
 sys.dont_write_bytecode = True
-ROOT = Path(os.environ.get('AXION_SFT_TEST_ROOT', Path(__file__).resolve().parents[1] / 'train/sft'))
+ROOT = Path(os.environ.get('AXION_SFT_TEST_ROOT', Path(__file__).resolve().parents[1] / 'axion/training/sft'))
 
 
 class LaunchTests(unittest.TestCase):
@@ -219,7 +219,7 @@ class ExportCheckTests(unittest.TestCase):
 
 class ExportArgumentTests(unittest.TestCase):
     def test_explicit_model_survives_checkpoint_config_before_model_initialization(self):
-        filename = ROOT.parent / 'swift/swift/megatron/arguments/export_args.py'
+        filename = Path(__file__).resolve().parents[1] / 'third_party/swift/swift/megatron/arguments/export_args.py'
         tree = ast.parse(filename.read_text())
         cls = next(node for node in tree.body if isinstance(node, ast.ClassDef)
                    and node.name == 'MegatronExportArguments')

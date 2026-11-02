@@ -39,8 +39,10 @@ venv/
 /output/
 /saves/
 /logs/
-train/sft/data/*
-!train/sft/data/dataset_info.json
+axion/training/sft/data/
+axion/training/rl/data/
+axion/training/rl/database/
+.secrets/
 *.ckpt.jsonl
 *.parquet
 *.safetensors

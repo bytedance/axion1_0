@@ -7,10 +7,10 @@ directly from their upstream projects under those terms.
 
 | Path | Project | License |
 |---|---|---|
-| `train/verl/` | [verl](https://github.com/verl-project/verl) | Apache-2.0 — `train/verl/LICENSE`, notice in `train/verl/Notice.txt` |
-| `train/verl/recipe/deepresearch/` | DeepResearch recipe, from [OSU-NLP-Group/QUEST](https://github.com/OSU-NLP-Group/QUEST) | repository MIT (Copyright 2026 OSU-NLP-Group); source files Apache-2.0 (Copyright 2025 DeepResearch authors) |
-| `train/swift/` | [ms-swift](https://github.com/modelscope/ms-swift) | Apache-2.0 — `train/swift/LICENSE`; source and changes in `train/swift/SOURCE.json` |
-| `train/sft/patches/` | [Megatron-LM](https://github.com/NVIDIA/Megatron-LM) GDN context-parallel backport | Apache-2.0 — patch provenance and hashes in `train/sft/provenance.json` |
+| `third_party/verl/` | [verl](https://github.com/verl-project/verl) | Apache-2.0 — `third_party/verl/LICENSE`, notice in `third_party/verl/Notice.txt` |
+| `axion/training/rl/` | DeepResearch recipe, from [OSU-NLP-Group/QUEST](https://github.com/OSU-NLP-Group/QUEST) | repository MIT (Copyright 2026 OSU-NLP-Group); source files Apache-2.0 (Copyright 2025 DeepResearch authors) |
+| `third_party/swift/` | [ms-swift](https://github.com/modelscope/ms-swift) | Apache-2.0 — `third_party/swift/LICENSE`; source and changes in `third_party/swift/SOURCE.json` |
+| `axion/training/sft/patches/` | [Megatron-LM](https://github.com/NVIDIA/Megatron-LM) GDN context-parallel backport | Apache-2.0 — patch provenance and hashes in `axion/training/sft/provenance.json` |
 | `axion/evaluation/hipho/official_impl/` | HiPhO grader, from [open-compass/VLMEvalKit](https://github.com/open-compass/VLMEvalKit) | Apache-2.0 (Copyright 2025 Garena Online Private Limited) — see that directory's README |
 
 ## Modifications
@@ -18,8 +18,9 @@ directly from their upstream projects under those terms.
 Files changed from their upstream versions carry a change notice in the file,
 as required by Apache-2.0 Section 4(b):
 
-- 32 files under `train/verl/recipe/deepresearch/`
-- Swift publication and training-runtime adaptations listed in `train/swift/SOURCE.json`
+- Modified DeepResearch files under `axion/training/rl/`
+- The fully asynchronous trainer Hydra search path in `third_party/verl/verl/experimental/fully_async_policy/config/fully_async_ppo_megatron_trainer.yaml`
+- Swift publication and training-runtime adaptations listed in `third_party/swift/SOURCE.json`
 
 The files under `axion/evaluation/hipho/official_impl/` are unmodified; `shim.py` in that
 directory is this project's own code and adapts to them.
@@ -27,8 +28,8 @@ directory is this project's own code and adapts to them.
 ## Python dependencies
 
 Data and evaluation dependencies are declared in `pyproject.toml`. SFT runtime
-requirements and upstream compatibility ranges are in `train/sft/` and
-`train/swift/`; these are separate from the RL framework's package metadata.
+requirements and upstream compatibility ranges are in `axion/training/sft/` and
+`third_party/swift/`; these are separate from the RL framework's package metadata.
 Dependencies retain their respective licenses.
 
 Two optional integrations have separate license terms and are not installed by

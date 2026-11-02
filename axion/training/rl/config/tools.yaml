@@ -1,0 +1,163 @@
+# Axion relocation: canonical package/resource paths; training behavior unchanged.
+# DeepResearch tools configuration
+#
+# Modified by the Axion authors from the DeepResearch recipe: comments and
+# log messages translated to English, hard-coded site paths replaced with
+# environment variables or relative paths, and bug fixes. Unmodified files in
+# this directory carry their original headers.
+#
+
+tools:
+  - class_name: axion.training.rl.tools.search_tool.DeepResearchSearchTool
+    config:
+      type: native
+      search_service_max_retries: 3   # Maximum retry count
+      search_service_timeout: 120   # Client timeout (120s; the server does not proactively time out)
+      # Set this when using a separate HTTP search service. Leave empty to use in-process cache+FAISS+Serper.
+      # Hot-reloadable conf file (re-read on every call); or set SEARCH_NODES_CONF env var.
+      search_nodes_conf: ${oc.env:SEARCH_NODES_CONF,axion/training/rl/config/search_nodes.conf}
+      # search_service_url: http://<host>:8000   # static fallback; or SEARCH_SERVICE_URL env var
+      # Serper API key (or SERPER_KEY_ID; optional when search_service_url is set)
+      serper_key: ${oc.env:SERPER_KEY_ID,""}
+      topk: 10
+      num_workers: 120
+      # Cache configuration (SQLite)
+      cache_enabled: true  # or set SEARCH_CACHE_ENABLED env var
+      cache_resume: true   # or set SEARCH_CACHE_RESUME env var
+      cache_dir: ${oc.env:SEARCH_CACHE_DIR,axion/training/rl/database}
+      cache_file: ${oc.env:SEARCH_CACHE_FILE,axion/training/rl/database/search.db}
+      cache_shards: 16   # or set SEARCH_CACHE_SHARDS env var
+      cache_auto_shard: true  # or set SEARCH_CACHE_AUTO_SHARD env var
+      cache_auto_merge: true  # or set SEARCH_CACHE_AUTO_MERGE env var
+      cache_shard_leader: null  # or set SEARCH_CACHE_SHARD_LEADER env var
+      # Optional FAISS semantic retrieval: top-1 by similarity, fallback to Serper if below threshold
+      # Real-time write + query supported (~200k vectors). Requires: pip install faiss-cpu sentence-transformers
+      faiss_enabled: true  # or SEARCH_FAISS_ENABLED
+      faiss_similarity_threshold: 0.85   # or SEARCH_FAISS_SIMILARITY_THRESHOLD
+      faiss_embedding_model: ${oc.env:DEEPRESEARCH_EMBEDDING_MODEL,""}
+    tool_schema:
+      type: function
+      function:
+        name: search
+        description: "Perform Google web searches then returns a string of the top search results."
+        parameters:
+          type: object
+          properties:
+            query:
+              type: array
+              items:
+                type: string
+              description: "The search query or an array of queries."
+          required:
+            - query
+
+  - class_name: axion.training.rl.tools.scholar_tool.DeepResearchScholarTool
+    config:
+      type: native
+      scholar_service_max_retries: 3
+      scholar_service_timeout: 120
+      scholar_nodes_conf: ${oc.env:SCHOLAR_NODES_CONF,axion/training/rl/config/scholar_nodes.conf}
+      serper_key: ${oc.env:SERPER_KEY_ID,""}
+      topk: 10
+      num_workers: 120
+      cache_enabled: true
+      cache_resume: true
+      cache_dir: ${oc.env:SCHOLAR_CACHE_DIR,axion/training/rl/database}
+      cache_file: ${oc.env:SCHOLAR_CACHE_FILE,axion/training/rl/database/scholar.db}
+      cache_shards: 16
+      cache_auto_shard: true
+      cache_auto_merge: true
+      cache_shard_leader: null
+      faiss_enabled: true
+      faiss_similarity_threshold: 0.85
+      faiss_embedding_model: ${oc.env:DEEPRESEARCH_EMBEDDING_MODEL,""}
+    tool_schema:
+      type: function
+      function:
+        name: google_scholar
+        description: "Leverage Google Scholar to retrieve relevant information from academic publications. Accepts multiple queries. This tool will also return results from google search"
+        parameters:
+          type: object
+          properties:
+            query:
+              type: array
+              items:
+                type: string
+                description: "The search query."
+              minItems: 1
+              description: "The list of search queries for Google Scholar."
+          required:
+            - query
+
+  - class_name: axion.training.rl.tools.python_tool.DeepResearchPythonTool
+    config:
+      type: native
+      backend: ${oc.env:PYTHON_SANDBOX_BACKEND,sandbox_fusion}
+      # Hot-reloadable Sandbox Fusion config. Supports:
+      # 1) endpoints=http://host:port/run_code,...
+      # 2) hosts=<host1>,<host2> + ports=9000,9001  -> Cartesian product
+      # When backend=e2b, python_nodes_conf / SANDBOX_FUSION_ENDPOINT are ignored.
+      python_nodes_conf: ${oc.env:PYTHON_NODES_CONF,axion/training/rl/config/python_nodes.conf}
+      # sandbox_fusion_endpoint: http://<host>:9000/run_code   # static fallback; or SANDBOX_FUSION_ENDPOINT env var
+      # Sets both the code run_timeout and the E2B sandbox lifetime
+      # (sandbox_timeout=min(timeout,300)). Bumped 50->120 so a sandbox does not
+      # expire mid-trajectory and trigger E2B 404s under queueing/contention.
+      timeout: 120
+      max_retries: 5
+    tool_schema:
+      type: function
+      function:
+        name: PythonInterpreter
+        description: "Executes Python code in a sandboxed environment. To use this tool, you must follow this format:\n1. The 'arguments' JSON object must be empty: {}.\n2. The Python code to be executed must be placed immediately after the JSON block, enclosed within <code> and </code> tags.\n\nIMPORTANT: Any output you want to see MUST be printed to standard output using the print() function.\n\nExample of a correct call:\n<tool_call>\n{\"name\": \"PythonInterpreter\", \"arguments\": {}}\n<code>\nimport numpy as np\n# Your code here\nprint(f\"The result is: {np.mean([1,2,3])}\")\n</code>\n</tool_call>"
+        parameters:
+          type: object
+          properties: {}
+          required: []
+
+  - class_name: axion.training.rl.tools.visit_tool.DeepResearchVisitTool
+    config:
+      type: native
+      # Jina API key (or use JINA_API_KEY env var)
+      jina_api_key: ${oc.env:JINA_API_KEY,""}
+      timeout: 50
+      max_content_length: 100000
+      # Cache configuration (SQLite)
+      cache_enabled: true  # or set VISIT_CACHE_ENABLED env var
+      cache_resume: true   # or set VISIT_CACHE_RESUME env var
+      cache_dir: ${oc.env:VISIT_CACHE_DIR,axion/training/rl/database}
+      cache_pool_dir: ${oc.env:VISIT_CACHE_POOL_DIR,""}
+      cache_file: ${oc.env:VISIT_CACHE_FILE,axion/training/rl/database/visit.db}
+      cache_shards: 16   # or set VISIT_CACHE_SHARDS env var
+      cache_auto_shard: true  # or set VISIT_CACHE_AUTO_SHARD env var
+      cache_auto_merge: true  # or set VISIT_CACHE_AUTO_MERGE env var
+      cache_shard_leader: null  # or set VISIT_CACHE_SHARD_LEADER env var
+      # LLM configuration for summarization (or use env vars)
+      # Shared API/Azure variables:
+      # - api_key / api_base
+      # - azure_endpoint / azure_api_version / azure_deployment
+      # Leave empty here if you want to configure everything from the launcher env.
+      api_key: ""
+      api_base: ""
+      azure_endpoint: ""
+      azure_api_version: ""
+      azure_deployment: ""
+      summary_model_name: ""
+    tool_schema:
+      type: function
+      function:
+        name: visit
+        description: "Visit webpage(s) and return the summary of the content."
+        parameters:
+          type: object
+          properties:
+            url:
+              type: array
+              items:
+                type: string
+              description: "The URL(s) of the webpage(s) to visit."
+            goal:
+              type: string
+              description: "The specific information goal for visiting the webpage."
+          required:
+            - url
+            - goal

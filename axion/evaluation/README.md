@@ -98,13 +98,13 @@ export SANDBOX_FUSION_ENDPOINT=http://127.0.0.1:9000/run_code
 ```
 
 To run that endpoint yourself, start the bundled
-[sandbox server](../../train/verl/recipe/deepresearch/tools/start_local_sandbox.sh)
+[sandbox server](../training/rl/tools/start_local_sandbox.sh)
 on the same port:
 
 ```bash
-cd ../../train/verl
+cd ../training/rl
 SANDBOX_RO_ROOT=/data SANDBOX_PORT=9000 \
-  bash recipe/deepresearch/tools/start_local_sandbox.sh
+  bash tools/start_local_sandbox.sh
 ```
 
 Serve the model being evaluated on its own endpoint, separate from the judge:

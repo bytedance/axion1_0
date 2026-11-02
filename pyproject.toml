@@ -5,13 +5,14 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "axion-research"
 version = "1.0.0"
-description = "Data construction and evaluation tools for Axion 1.0"
+description = "Training, data construction and evaluation for Axion 1.0"
 readme = "README.md"
 requires-python = ">=3.11"
 license = {file = "LICENSE"}
 dependencies = []
 
 [project.optional-dependencies]
+training = ["PyYAML>=6", "packaging>=23"]
 data = ["openai==2.44.0"]
 evaluation = [
     "openai==2.44.0",
@@ -21,7 +22,7 @@ evaluation = [
     "sympy==1.14.0",
     "pylatexenc==2.10",
 ]
-test = ["pytest>=8", "openai==2.44.0", "PyYAML>=6", "packaging>=23"]
+test = ["pytest>=8", "openai==2.44.0", "PyYAML>=6", "packaging>=23", "hydra-core>=1.3,<1.4"]
 
 [project.urls]
 Homepage = "https://axion1-0.github.io/"
@@ -32,6 +33,9 @@ include = ["axion", "axion.*"]
 namespaces = false
 
 [tool.setuptools.package-data]
+"axion.training" = ["README.md"]
+"axion.training.sft" = ["*.yaml", "*.json", "*.sh", "*.txt", "README.md", "patches/*.diff", "patches/README.md"]
+"axion.training.rl" = ["*.sh", "README.md", "config/*.yaml", "config/*.conf", "config/*.template", "scripts/*.sh", "tools/*.sh"]
 "axion.evaluation.frontierscience" = ["prompts/*.txt"]
 "axion.evaluation.seal0" = ["prompts/*.txt"]
 "axion.evaluation.hle" = ["subset_130_ids.txt"]

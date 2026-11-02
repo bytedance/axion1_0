@@ -29,32 +29,7 @@
     <a href="mailto:yuqi.jia@duke.edu">yuqi.jia@duke.edu</a> ·
     <a href="mailto:tianyunjie96@gmail.com">tianyunjie96@gmail.com</a>
   </p>
-
-  <p>
-    <a href="#highlights">Highlights</a> ·
-    <a href="#benchmark-results">Results</a> ·
-    <a href="#the-recipe">The Recipe</a> ·
-    <a href="#getting-started">Getting Started</a> ·
-    <a href="#citation">Citation</a>
-  </p>
 </div>
-
----
-
-**Axion 1.0** is a family of agent foundation models for scientific reasoning,
-information seeking, and problem solving with tools. Its training follows a
-simple progression: **learn to reason → learn to investigate → learn through
-interaction**. Two stages of supervised fine-tuning (SFT), followed by
-reinforcement learning (RL), develop these capabilities from Qwen base models.
-
-The central investment is in the data: challenging problems that respond to
-the base model's capabilities, and tasks grounded in real data with answers
-that can be verified. This repository shares the data construction pipelines,
-prompts, training recipes, and evaluation tools behind the work.
-
-| **18,363** | **35B / 122B** | **128K** | **6** |
-|:---:|:---:|:---:|:---:|
-| SFT trajectories across two stages | Main MoE models | SFT context in the paper | Evaluation settings |
 
 ## Highlights
 
@@ -100,13 +75,6 @@ Selected results from Table 1 of the
 *BMB: BioMysteryBench, human-difficult subset. FS: FrontierScience. A dash
 denotes an unreported result. An asterisk marks a baseline evaluated by the
 Axion team; other baseline scores in this table come from official reports.*
-
-> [!NOTE]
-> Axion scores are the best single-run scores from three runs per benchmark,
-> or five for BMB. HLE here is the **full benchmark**, with access to websites
-> such as Hugging Face blocked. The paper's training-stage comparisons use a
-> separate **130-question text-only subset (HLE-130)**. Baseline tool access and
-> execution settings may differ; see Section 4.1 and Table 1 of the report.
 
 ### Model family
 

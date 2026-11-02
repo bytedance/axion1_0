@@ -13,22 +13,16 @@
   </p>
 
   <p>
-    <a href="https://jyqhahah.github.io/">Yuqi Jia</a><sup>1</sup> · <a href="https://sunsmarterjie.github.io/">Yunjie Tian</a><sup>2,†</sup> · <a href="https://www.linkedin.com/in/jiayu-zheng-5aa231250/">Jiayu Zheng</a><sup>2</sup><br>
-    <a href="https://joliang17.github.io/">Yijun Liang</a><sup>3</sup> · <a href="https://jingchensun.github.io/">Jingchen Sun</a><sup>4</sup> · <a href="https://www.linkedin.com/in/mengyu-zhao-7ab19274/">Mengyu Zhao</a><sup>2</sup> · Di Fu<sup>2</sup>
+    <a href="https://jyqhahah.github.io/">Yuqi Jia</a><sup>1</sup> · <a href="https://sunsmarterjie.github.io/">Yunjie Tian</a><sup>2,†</sup> · <a href="https://www.linkedin.com/in/jiayu-zheng-5aa231250/">Jiayu Zheng</a><sup>2</sup> · <a href="https://joliang17.github.io/">Yijun Liang</a><sup>3</sup> · <a href="https://jingchensun.github.io/">Jingchen Sun</a><sup>4</sup> · <a href="https://www.linkedin.com/in/mengyu-zhao-7ab19274/">Mengyu Zhao</a><sup>2</sup> · Di Fu<sup>2</sup>
   </p>
   <p>
     <sup>1</sup> Duke University &nbsp; <sup>2</sup> ByteDance<br>
     <sup>3</sup> University of Maryland, College Park &nbsp; <sup>4</sup> University at Buffalo<br>
     <sup>†</sup> Project Lead
   </p>
-  <p>
-    <strong>Correspondence:</strong>
-    <a href="mailto:yuqi.jia@duke.edu">yuqi.jia@duke.edu</a> ·
-    <a href="mailto:tianyunjie96@gmail.com">tianyunjie96@gmail.com</a>
-  </p>
 </div>
 
-## Highlights
+## 1. Highlights
 
 - **Three-stage training.** Two stages of supervised fine-tuning (SFT) followed
   by reinforcement learning (RL), without dedicated mid-training, DPO, or
@@ -43,7 +37,7 @@
   filtering, prompts, two-stage SFT, asynchronous RL, and benchmark preparation
   and grading.
 
-## Results
+## 2. Results
 
 <p align="center">
   <a href="assets/benchmark-results.png">
@@ -68,7 +62,7 @@ BMB denotes the human-difficult subset of BioMysteryBench; FS denotes
 FrontierScience. * marks baselines evaluated by the Axion team; other baseline
 scores are from official reports. — denotes an unreported result.
 
-### Models
+### 2.1 Models
 
 | Model | Base model | Total / active parameters |
 |:---|:---|:---:|
@@ -78,10 +72,11 @@ scores are from official reports. — denotes an unreported result.
 Both models in the paper use SFT and RL. The paper also reports 4B and 9B
 variants trained with SFT only.
 
-Model weights and training datasets are listed as *Coming soon* on the
-[project website](https://axion1-0.github.io/).
+Training data is available on
+[Hugging Face](https://huggingface.co/datasets/Axion1-0/axion-training-data).
+Model weights are coming soon.
 
-## Training Recipe
+## 3. Training Recipe
 
 Data construction establishes questions and reference answers before collecting
 solution trajectories. Only verified trajectories are retained for SFT.
@@ -92,7 +87,7 @@ solution trajectories. Only verified trajectories are retained for SFT.
   </a>
 </p>
 
-### Stage I: Self-Contained Reasoning
+### 3.1 Stage I: Self-Contained Reasoning
 
 Stage I uses **10,819 trajectories** of scientific and mathematical reasoning.
 Public seed problems are rewritten into harder questions. Problems solved by
@@ -100,7 +95,7 @@ the base model are further strengthened through composition, parameterization,
 range shifts, or case analysis, with reference answers checked after each
 rewrite. Solvers may use Python, but not search or webpage retrieval.
 
-### Stage II: Tool-Dependent Reasoning
+### 3.2 Stage II: Tool-Dependent Reasoning
 
 Stage II uses **7,544 trajectories**, approximately **312M tokens**. Programs
 filter records, select a unique entity, and compute a reference answer before
@@ -112,7 +107,7 @@ Generators cover individual entities, ranked lists, and chains across
 databases, including the NASA Exoplanet Archive, OurAirports, OpenAlex,
 UniProt, and Ensembl.
 
-### Reinforcement Learning
+### 3.3 Reinforcement Learning
 
 Starting from the Stage II checkpoint, **asynchronous GRPO** trains on agent
 interactions with search, webpage visits, scholarly retrieval, and Python.
@@ -120,7 +115,7 @@ Correct final answers receive full reward; verified intermediate progress can
 receive partial credit. Context condensation divides long rollouts into
 sessions for training.
 
-### Training Infrastructure
+### 3.4 Training Infrastructure
 
 The paper's SFT runs use a 128K context window with FSDP, expert parallelism,
 and context parallelism. RL separates rollout workers, trainers, and auxiliary
@@ -140,7 +135,7 @@ These costs are reported in the paper. The released 122B SFT recipe uses
 arguments record micro-batch size 1; Section 5.1 lists 2. The released
 [SFT recipe](axion/training/sft/README.md) preserves the saved training arguments.
 
-## Getting Started
+## 4. Getting Started
 
 Clone the repository and follow the [training guide](axion/training/README.md)
 for environment setup, two-stage SFT and checkpoint export. SFT uses Swift with
@@ -176,7 +171,7 @@ For data construction and evaluation, use a separate Python 3.11+ environment:
 python -m pip install -e ".[data,evaluation]"
 ```
 
-### Documentation
+### 4.1 Documentation
 
 | Guide | Contents |
 |:---|:---|
@@ -189,11 +184,11 @@ python -m pip install -e ".[data,evaluation]"
 Evaluation scripts prepare datasets and grade rollouts collected with an
 external agent harness. The evaluation guide documents the required format.
 
-## License
+## 5. License
 
 [Apache 2.0](LICENSE).
 
-## Citation
+## 6. Citation
 
 ```bibtex
 @techreport{jia2026axion,

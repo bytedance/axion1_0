@@ -262,6 +262,10 @@ services; the [evaluation guide](eval/README.md) covers grading endpoints.
 
 </details>
 
+## License
+
+[Apache 2.0](LICENSE).
+
 ## Citation
 
 If you use Axion's models, methods, or code in your research, please cite the
@@ -276,13 +280,6 @@ If you use Axion's models, methods, or code in your research, please cite the
   url    = {https://axion1-0.github.io/paper/axion.pdf}
 }
 ```
-
-## License
-
-This project's own code and associated documentation are released under the
-[Apache License, Version 2.0](LICENSE). Vendored third-party components retain
-their original licenses and notices; see [THIRD_PARTY.md](THIRD_PARTY.md).
-Figure and logo sources are recorded in [assets/README.md](assets/README.md).
 
 <p align="center">
   <a href="https://axion1-0.github.io/">Project Website</a> ·

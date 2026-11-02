@@ -16,8 +16,7 @@
     <a href="https://jyqhahah.github.io/">Yuqi Jia</a><sup>1</sup> · <a href="https://sunsmarterjie.github.io/">Yunjie Tian</a><sup>2,†</sup> · <a href="https://www.linkedin.com/in/jiayu-zheng-5aa231250/">Jiayu Zheng</a><sup>2</sup> · <a href="https://joliang17.github.io/">Yijun Liang</a><sup>3</sup> · <a href="https://jingchensun.github.io/">Jingchen Sun</a><sup>4</sup> · <a href="https://www.linkedin.com/in/mengyu-zhao-7ab19274/">Mengyu Zhao</a><sup>2</sup> · Di Fu<sup>2</sup>
   </p>
   <p>
-    <sup>1</sup> Duke University &nbsp; <sup>2</sup> ByteDance<br>
-    <sup>3</sup> University of Maryland, College Park &nbsp; <sup>4</sup> University at Buffalo<br>
+    <sup>1</sup> Duke University &nbsp; <sup>2</sup> ByteDance &nbsp; <sup>3</sup> University of Maryland, College Park &nbsp; <sup>4</sup> University at Buffalo<br>
     <sup>†</sup> Project Lead
   </p>
 </div>

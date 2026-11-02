@@ -9,6 +9,7 @@
   <p>
     <a href="https://axion1-0.github.io/"><img src="https://img.shields.io/badge/Project-Website-2563EB?style=flat-square" alt="Project website"></a>
     <a href="https://axion1-0.github.io/paper/axion.pdf"><img src="https://img.shields.io/badge/Read-Technical_Report-0F766E?style=flat-square" alt="Technical report"></a>
+    <a href="https://huggingface.co/datasets/Axion1-0/axion-training-data"><img src="https://img.shields.io/badge/Data-Hugging_Face-0F766E?style=flat-square" alt="Training data on Hugging Face"></a>
     <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache_2.0-2563EB?style=flat-square" alt="Apache 2.0 license"></a>
   </p>
 

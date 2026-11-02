@@ -10,7 +10,6 @@ WORKING_DIR=${WORKING_DIR:-"${PWD}"}
 RUNTIME_ENV=${RUNTIME_ENV:-"${WORKING_DIR}/verl/trainer/runtime_env.yaml"}
 # Paths
 DATA_PATH=${RAY_DATA_HOME:-"${HOME}/verl"}
-DATA_PATH=${DATA_PATH:-"/mnt/bn/${BYTENAS}"}
 # very important! please modify the max_position_embeddings in config.json to 32768 after downloading from huggingface
 MODEL_PATH=${MODEL_PATH:-"${DATA_PATH}/shared/models/Qwen3-30B-A3B-Base"}
 CKPTS_DIR=${CKPTS_DIR:-"${DATA_PATH}/ckpts/${project_name}/${exp_name}"}

@@ -10,9 +10,9 @@
     "sha256": "3dd66894874485efe2811130772729f9157e6ebb3b2dd11320b57ef0b38459c4"
   },
   "backend": {
-    "source": "data/open_verl",
-    "branch": "quest-deepresearch-port",
-    "revision": "b1f05f92ad76e70e5684747d97d0dc6b7920834f"
+    "source": "verl-project/verl",
+    "revision": "b1f05f92ad76e70e5684747d97d0dc6b7920834f",
+    "kind": "Axion development snapshot; revision is not a public upstream commit"
   },
   "reward_source": {
     "source": "Axion/sciteacher code/rl/process_reward.py",

@@ -14,8 +14,7 @@
 """Ship a multimodal payload to the rollout server by reference, resolved once per server.
 
 Ray dereferences an ObjectRef passed as a top-level task argument, so each turn of a multi-turn
-trajectory re-deserializes the same video: ~180 MB per 64-frame clip (float32), ~26 GB per step
-across the rollout servers on the moderation run, visible as torch.load in the server's stacks.
+trajectory re-deserializes the same video, increasing host memory and transport costs.
 An ObjectRef nested inside another object is NOT resolved by Ray, so wrapping it keeps a
 reference on the wire; the server awaits it once and serves later turns from a small LRU.
 

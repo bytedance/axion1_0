@@ -47,6 +47,7 @@ or /16 (IPv6) is refused at startup. Keep the list as narrow as the deployment
 allows, and never put this service on an untrusted network.
 
 Usage:
+  export SANDBOX_RO_ROOT=/path/to/shared-storage
   python local_sandbox_server.py --port 9000 --workers 32
   then write the endpoint into axion/training/rl/config/python_nodes.conf
   (hot-reloaded, no need to restart training):
@@ -79,8 +80,7 @@ ISOLATE = os.environ.get("SANDBOX_ISOLATE", "1").strip() == "1"
 # no caller authentication, so this allowlist is its only access boundary and
 # the default is the narrowest one that still works: loopback. Reaching the
 # service from other hosts -- which a multi-node run needs -- requires setting
-# SANDBOX_ALLOW to a comma-separated list of CIDRs; SANDBOX_ALLOW=any disables
-# the check and is only ever appropriate on an isolated network.
+# SANDBOX_ALLOW to a comma-separated list of CIDRs.
 # Loopback is always allowed: anyone on the host can already run code as this
 # user, and the start script health-checks over it. SANDBOX_ALLOW adds to this
 # list rather than replacing it, and no value switches the check off -- a
@@ -129,13 +129,16 @@ def _client_allowed(addr: str) -> bool:
     if getattr(ip, "ipv4_mapped", None):
         ip = ip.ipv4_mapped
     return any(ip in net for net in ALLOW_NETS)
-#
-def _default_ro_roots() -> str:
-    import glob as _g
-    roots = sorted(d.rstrip("/") for d in _g.glob("/mnt/bn/*/") if os.path.isdir(d))
-    return ",".join(roots)
 
-NAS_ROOT = os.environ.get("SANDBOX_RO_ROOT") or _default_ro_roots()
+
+def _read_only_roots() -> list[str]:
+    roots = [part.strip() for part in os.environ.get("SANDBOX_RO_ROOT", "").split(",") if part.strip()]
+    if not roots or any(not os.path.isabs(root) or not os.path.isdir(root) for root in roots):
+        raise ValueError("SANDBOX_RO_ROOT must name existing absolute storage directories, separated by commas")
+    return roots
+
+
+READ_ONLY_ROOTS = _read_only_roots()
 
 _stats = {"total": 0, "ok": 0, "err": 0, "timeout": 0}
 _lock = threading.Lock()
@@ -171,16 +174,11 @@ def _build_cmd(script: str) -> list:
     else:
         inner = ulimits + f"exec {PYTHON_BIN} -I {script}"
     if ISOLATE and shutil.which("unshare"):
-        _roots = [r.strip() for r in (NAS_ROOT or "").split(",") if r.strip()]
-        if not _roots:
-            guard = ("echo 'sandbox: no NAS root to remount read-only "
-                     "(set SANDBOX_RO_ROOT)' >&2; exit 97; ")
-        else:
-            guard = "".join(
-                f"mount -o remount,ro,bind {r} 2>/dev/null || "
-                f"{{ echo 'sandbox: failed to remount {r} read-only' >&2; exit 97; }}; "
-                for r in _roots
-            )
+        guard = "".join(
+            f"mount -o remount,ro,bind {shlex.quote(root)} 2>/dev/null || "
+            "{ echo 'sandbox: failed to remount storage read-only' >&2; exit 97; }; "
+            for root in READ_ONLY_ROOTS
+        )
         return ["unshare", "--user", "--map-root-user", "--mount", "--net",
                 "--", "/bin/sh", "-c", guard + inner]
     return ["/bin/sh", "-c", inner]

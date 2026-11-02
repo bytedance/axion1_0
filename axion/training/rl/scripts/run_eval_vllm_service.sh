@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Start one or more local OpenAI-compatible vLLM eval/judge services.
-# Intended to run on a dedicated service-only node from the 35B with-services
-# wrapper so the training job can consume local_openai judge endpoints.
+# Run on a dedicated service node and supply its endpoints in the RL deployment
+# configuration for judge and summarizer requests.
 #
 # Modified by the Axion authors from the DeepResearch recipe: comments and
 # log messages translated to English, hard-coded site paths replaced with

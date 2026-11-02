@@ -1229,8 +1229,7 @@ class Template(ProcessorMixin):
                     # `isinstance(..., str)` guard above skips exactly those turns, so an agent
                     # corpus gets the prefix on its verdict turns but not on its tool-call turns,
                     # and training then renders differently from serving. With this on, training is
-                    # token-identical to serving (the tobacco v11 recipe, 2026-09-02; see
-                    # aip_rlvr/moderation_agent/FORMAT_AUDIT.md in the open_verl repo). Two edits:
+                    # token-identical to the serving template through two edits:
                     #   1. prefix the first string part, as the str branch would have;
                     #   2. restore the blank line the serving chat_template puts between the
                     #      assistant content and the call, which the list join drops.

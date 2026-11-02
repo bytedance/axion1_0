@@ -61,10 +61,8 @@ logger.setLevel(os.getenv("VERL_LOGGING_LEVEL", "WARN"))
 
 def _weight_sync_empty_cache():
     """Release cached CUDA blocks around the weight sync. VERL_WEIGHT_SYNC_GC=0 skips the full
-    gc.collect() passes of aggressive_empty_cache: the call measured 5.3 s/rank on the moderation run,
-    ~43% of it in gc.collect() (py-spy). Whether empty_cache() alone frees enough before the vLLM
-    wake is what the A/B checks:
-    a regression shows up as the wake_up OOM described above."""
+    gc.collect() passes of aggressive_empty_cache. Disabling collection can reduce synchronization
+    overhead but may leave too little memory for the vLLM wake-up."""
     if os.environ.get("VERL_WEIGHT_SYNC_GC", "1") == "0":
         get_torch_device().empty_cache()
         get_torch_device().synchronize()

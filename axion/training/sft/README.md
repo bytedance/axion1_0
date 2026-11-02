@@ -46,8 +46,8 @@ configure your network outside this launcher.
 Swift includes the paired CP/FSDP guard change, eight-thread synchronous DCP
 writer and single-process export fix. **Lifting the Swift guard alone is not
 sufficient**; the launcher checks the full MCore backport before training/export.
-The imported `agent_sft` source is not proven identical to the original mutable
-`bt_sft` training image. [provenance.json](provenance.json) records this distinction.
+The imported development snapshot is not proven identical to the original mutable
+training image. [provenance.json](provenance.json) records this distinction.
 
 ## Data
 

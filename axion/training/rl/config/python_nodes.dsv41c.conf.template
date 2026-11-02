@@ -1,7 +1,0 @@
-#
-# Modified by the Axion authors from the DeepResearch recipe: comments and
-# log messages translated to English, hard-coded site paths replaced with
-# environment variables or relative paths, and bug fixes. Unmodified files in
-# this directory carry their original headers.
-#
-endpoint=http://127.0.0.1:<sandbox-port>/run_code

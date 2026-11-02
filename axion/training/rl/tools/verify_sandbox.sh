@@ -11,6 +11,16 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CONF="${PYTHON_NODES_CONF:-$HERE/../config/python_nodes.conf}"
 PRUNE=0; [[ "${1:-}" == "--prune" ]] && PRUNE=1
 
+# Use the explicitly configured server-side root, including paths with quotes.
+if ! PROBE_CODE=$(python3 - <<'PY_PROBE'
+import os
+roots = [part.strip() for part in os.environ.get('SANDBOX_RO_ROOT', '').split(',') if part.strip()]
+if not roots or any(not os.path.isabs(root) for root in roots):
+    raise SystemExit('SANDBOX_RO_ROOT must name absolute server-side storage directories')
+print("open(%r,'w').write('x');print('WRITABLE')" % (roots[0].rstrip('/') + '/__probe'))
+PY_PROBE
+); then exit 1; fi
+
 mapfile -t EPS < <(grep -oE "https?://[^ ]+" "$CONF" 2>/dev/null | sed 's#/run_code$##' | grep -v '<ip>' | sort -u)
 if [[ ${#EPS[@]} -eq 0 ]]; then echo "no endpoint found in $CONF" >&2; exit 1; fi
 echo "node $(hostname) | conf: $CONF | ${#EPS[@]} endpoints"
@@ -30,9 +40,7 @@ for ep in "${EPS[@]}"; do
     echo "  unreachable or wrong result (status=${st:-no response})"; DEAD+=("$ep"); continue
   fi
   echo "  reachable, compute correct"
-  _probe_root="${SANDBOX_RO_ROOT%%,*}"
-  if [[ -z "$_probe_root" ]]; then for _d in /mnt/bn/*/; do [[ -d "$_d" ]] && { _probe_root="${_d%/}"; break; }; done; fi
-  w=$(post "$ep" "open('${_probe_root}/__probe','w').write('x');print('WRITABLE')" | field status)
+  w=$(post "$ep" "$PROBE_CODE" | field status)
   n=$(post "$ep" "import socket;socket.create_connection(('1.1.1.1',53),timeout=3);print('NET')" | field status)
   [[ "$w" == "Error" ]] && echo "  storage read-only" || echo "  storage WRITABLE -- unsafe, do not use this endpoint"
   [[ "$n" == "Error" ]] && echo "  network cut off" || echo "  network NOT isolated"

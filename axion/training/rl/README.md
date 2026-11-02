@@ -117,6 +117,15 @@ Retrieval service helpers are in `scripts/run_search_service.sh` and
 credentials before starting them. Point the deployment URLs to the running
 services. The launcher uses these URLs rather than bundled localhost defaults.
 
+For the bundled local Python service, set `SANDBOX_RO_ROOT` to the absolute
+shared-storage mount paths on each service host (comma-separated). Set
+`SANDBOX_ALLOW` to the trainer-node CIDRs for multi-node access. Then run
+`bash axion/training/rl/tools/start_local_sandbox.sh` and use the reported endpoint
+in the deployment configuration. `SANDBOX_PORT` selects a port explicitly;
+otherwise the script searches 9100–9199, excluding busy and reserved ports.
+`SANDBOX_RESERVED_PORTS` adds comma-separated deployment-specific exclusions.
+The service retains read-only mounts, network isolation and startup smoke checks.
+
 Start the Ray cluster in the prepared environment, then run from the repository
 root. Set `RL_UPDATES` to the desired positive, even number of optimizer updates;
 the paper does not report the final count.

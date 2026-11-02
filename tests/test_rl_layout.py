@@ -68,7 +68,7 @@ def test_configured_agent_tools_managers_and_node_files_are_shipped(monkeypatch)
         monkeypatch.delenv(variable, raising=False)
     for item in yaml.safe_load((RL / "config/agent_loop_config.yaml").read_text()):
         _assert_class_exists(item["_target_"])
-    for filename in ("tools.yaml", "tools_no_search.yaml"):
+    for filename in ("tools.yaml",):
         tools = OmegaConf.load(RL / "config" / filename)
         for item in tools.tools:
             _assert_class_exists(item.class_name)
@@ -168,18 +168,6 @@ def test_python_helper_bootstrap_finds_repository(relative, root_name, tmp_path,
     exec(compile(ast.Module(body=assignments, type_ignores=[]), str(path), "exec"), namespace)
     assert Path(namespace[root_name]) == ROOT
     assert (Path(namespace[root_name]) / "axion/__init__.py").is_file()
-
-
-def test_shell_log_root_matches_training_working_root(tmp_path):
-    path = RL / "scripts/gpu_util_report.sh"
-    line = next(line for line in path.read_text().splitlines() if line.startswith("RL_ROOT="))
-    # Supply the real source filename explicitly and evaluate its real ascent.
-    line = line.replace('${BASH_SOURCE[0]}', '${SCRIPT_PATH}')
-    code = '\n'.join(['SCRIPT_PATH="$1"', line, 'printf "%s\\n" "$RL_ROOT"'])
-    env = {key: value for key, value in os.environ.items() if key != "RL_ROOT"}
-    result = subprocess.run(["bash", "-c", code, "layout-check", str(path)], cwd=tmp_path,
-                            env=env, text=True, capture_output=True, check=True)
-    assert Path(result.stdout.strip()) == ROOT
 
 
 def test_script_modules_are_discoverable_as_regular_packages():

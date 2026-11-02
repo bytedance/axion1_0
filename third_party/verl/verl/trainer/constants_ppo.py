@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# Axion publication: omit unrelated private storage and task environment forwarding.
+
 import json
 import os
 
@@ -132,7 +134,7 @@ def get_ppo_ray_runtime_env(config=None):
         "VERL_AGENT_LOOP_MM_CACHE",
         "VERL_MAX_TOKENS_PER_TURN",
         # GPU quiesce before vLLM cache-clear/sleep on the abort path (vllm_async_server);
-        # default on, set 0 to A/B (see rl/PITFALLS.md, colocate_async illegal memory access).
+        # default on; set 0 to compare behavior when diagnosing illegal memory access.
         "VERL_VLLM_QUIESCE",
         "VERL_PHASE_TRACE",
         "VERL_PHASE_TRACE_DIR",
@@ -150,33 +152,7 @@ def get_ppo_ray_runtime_env(config=None):
         "WANDB_API_KEY",
         "WANDB_BASE_URL",
         "PYTHONFAULTHANDLER",
-        # TOS-backed video dataset (aip_rlvr/moderation_agent/rl/tos_video_dataset.py)
-        "TOS_MALIVA_ACCESS_KEY",
-        "TOS_LOCAL_CACHE",
-        "MODERATION_MAX_FRAMES",
-        "MODERATION_DENSE_MAX",
-        "MODERATION_INSPECT_MAX_PIXELS",
-        "MODERATION_ENABLE_INSPECT_FRAMES",
-        "MODERATION_ENABLE_CONCEPT_SEARCH",
-        "MODERATION_SEARCH_BACKEND",
-        "MODERATION_SEARCH_CACHE",
-        "MODERATION_SEARCH_PROXY",
-        "MODERATION_SEARCH_TRUST_ENV",
-        "MODERATION_SEARCH_TOPK",
-        "GEMINI_AKS",
-        "GEMINI_MODEL",
-        "MODERATION_VIDEO_FPS",
-        "MODERATION_TOS_VIDEO_MODE",
-        "MODERATION_TOS_VIDEO_TMP",
-        "MODERATION_TOS_CONFIG",
-        "SWIFT_TOS_HANDLER_ROOT",
     ):
         if os.environ.get(key) is not None:
             runtime_env["env_vars"][key] = os.environ[key]
-    # Reward knobs (aip_rlvr/moderation_agent/rl/reward.py) — forwarded by prefix so a new
-    # weight or side-file path (e.g. MODERATION_RL_GT_FRAMES) cannot be silently dropped in
-    # the Ray-side reward worker while looking set in the launcher.
-    for key, val in os.environ.items():
-        if key.startswith("MODERATION_RL_"):
-            runtime_env["env_vars"][key] = val
     return runtime_env

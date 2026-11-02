@@ -14,6 +14,19 @@ set -uo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CONF="${PYTHON_NODES_CONF:-$HERE/../config/python_nodes.conf}"
+SERVER_PY="${SERVER_PY:-/usr/bin/python3}"
+# Reuse server validation before touching any running service.
+if ! SANDBOX_RO_ROOT=$("$SERVER_PY" - "$HERE" <<'PY_CONFIG'
+import sys
+sys.path.insert(0, sys.argv[1])
+from local_sandbox_server import READ_ONLY_ROOTS
+print(",".join(READ_ONLY_ROOTS))
+PY_CONFIG
+); then
+  echo "[sandbox] configure SANDBOX_RO_ROOT and SANDBOX_ALLOW before starting" >&2
+  exit 1
+fi
+export SANDBOX_RO_ROOT
 for pid in $(ps -eo pid,cmd | grep "local_sandbox_serve[r].py" | awk '{print $1}'); do
   echo "[sandbox] stopping old instance pid=$pid"
   kill "$pid" 2>/dev/null
@@ -27,46 +40,36 @@ _port_forbidden() {
   [[ "$p" -ge 6000  && "$p" -le 6003  ]] && return 0
   [[ "$p" == "8000" || "$p" == "8001" ]] && return 0            # search / scholar
   local v
-  for v in $(env | grep -oE "^(ARNOLD|METIS)_WORKER_[0-9]+_PORT=[0-9]+" | cut -d= -f2); do
-    [[ "$p" == "$v" ]] && return 0
+  local SANDBOX_RESERVED_PORTS="${SANDBOX_RESERVED_PORTS:-}"
+  for v in ${SANDBOX_RESERVED_PORTS//,/ }; do
+    [[ "$v" =~ ^[0-9]{1,5}$ ]] && (( p == 10#$v )) && return 0
   done
   return 1
 }
 PORT="${SANDBOX_PORT:-}"
 if [[ -n "$PORT" ]]; then
+  if [[ ! "$PORT" =~ ^[0-9]{1,5}$ ]] || (( 10#$PORT < 1 || 10#$PORT > 65535 )); then
+    echo "[sandbox] SANDBOX_PORT must be between 1 and 65535" >&2; exit 1
+  fi
+  PORT=$((10#$PORT))
   if _port_forbidden "$PORT"; then
     echo "[sandbox] SANDBOX_PORT=$PORT is in the reserved range (Ray / judge / search services); pick another or leave it unset" >&2; exit 1
   fi
   if _port_busy "$PORT"; then echo "[sandbox] SANDBOX_PORT=$PORT is already in use" >&2; exit 1; fi
 else
   PORT=""
-  for _cand in $(env | grep -oE "^ARNOLD_RESERVED_[0-9]+_CURRENT_PORT=[0-9]+" | cut -d= -f2 | sort -n) \
-               $(seq 9100 9199); do
+  for _cand in $(seq 9100 9199); do
     _port_forbidden "$_cand" && continue
     _port_busy "$_cand" && continue
     PORT="$_cand"; break
   done
   if [[ -z "$PORT" ]]; then echo "[sandbox] no free port available" >&2; exit 1; fi
-  echo "[sandbox] selected port $PORT (from this trial's reserved pool or the fallback range)"
+  echo "[sandbox] selected port $PORT (from 9100–9199)"
 fi
 WORKERS="${WORKERS:-64}"
 LOG="${SANDBOX_LOG:-/tmp/local_sandbox_${PORT}.log}"
-SERVER_PY="${SERVER_PY:-/usr/bin/python3}"
 export SANDBOX_PYTHON="${SANDBOX_PYTHON:-/usr/bin/python3}"
 export SANDBOX_ISOLATE="${SANDBOX_ISOLATE:-1}"
-if [[ -z "${SANDBOX_RO_ROOT:-}" ]]; then
-  _ro_roots=""
-  for _d in /mnt/bn/*/; do
-    [[ -d "$_d" ]] || continue
-    _ro_roots="${_ro_roots}${_ro_roots:+,}${_d%/}"
-  done
-  export SANDBOX_RO_ROOT="$_ro_roots"
-fi
-if [[ -z "$SANDBOX_RO_ROOT" ]]; then
-  echo "[sandbox] no shared-storage mount detected, read-only isolation cannot be guaranteed;" >&2
-  echo "[sandbox]   set SANDBOX_RO_ROOT explicitly before running (comma-separated for several)." >&2
-  exit 1
-fi
 echo "[sandbox] read-only roots: $SANDBOX_RO_ROOT"
 # The server accepts loopback only unless SANDBOX_ALLOW names wider networks.
 # A single-node run needs nothing; a multi-node run has to opt in, because the
@@ -94,7 +97,7 @@ if [[ -z "$ADVERTISE_HOST" && -z "${SANDBOX_ALLOW:-}" ]]; then
   ADVERTISE_HOST="127.0.0.1"
 fi
 if [[ -z "$ADVERTISE_HOST" ]]; then
-  _peer="${HEAD_NODE_IP:-${ARNOLD_WORKER_0_HOST:-}}"
+  _peer="${HEAD_NODE_IP:-}"
   if [[ -n "$_peer" ]]; then
     ADVERTISE_HOST="$(ip route get "$_peer" 2>/dev/null | sed -n 's/.* src \([0-9a-f:.]*\).*/\1/p' | head -1)"
   else

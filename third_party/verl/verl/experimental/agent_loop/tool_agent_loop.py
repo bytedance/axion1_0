@@ -313,8 +313,6 @@ class ToolAgentLoop(AgentLoopBase):
         # halted by an injected tool-parser stop (</tool_call>), the model never sampled the
         # assistant turn-end token — the trained stream then shows the observation following
         # the call directly, and "stop after a call" is an action the policy never performs.
-        # Measured consequence (qwen38 tobacco v10-RL, 188 steps): serve-time p(<|im_end|> |
-        # </tool_call>) eroded to ~0 and 97% of calls were dropped at chat-completions serving.
         # Fix: append <|im_end|> as if sampled (response_mask 1, placeholder logprob) so every
         # assistant turn ends exactly as SFT and serving require; the KL-to-ref term then
         # actively anchors the stop habit instead of letting it drift unobserved. The next

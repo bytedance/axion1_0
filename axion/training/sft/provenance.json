@@ -86,24 +86,24 @@
   ],
   "source_distinction": {
     "imported_source": {
-      "project": "tns/swift",
-      "branch": "agent_sft",
-      "commit": "06686330164c1221d069d774a0dcb5092a8b2260"
+      "project": "modelscope/ms-swift",
+      "commit": "06686330164c1221d069d774a0dcb5092a8b2260",
+      "kind": "Axion development snapshot; revision is not a public upstream commit"
     },
-    "original_training_job_branch": "bt_sft",
     "original_training_image_commit": null,
     "original_training_image_digest": null,
     "job_configuration_uses_latest_commit": true,
-    "comparison_only_current_bt_sft_head": "ab8b8ec214c9331359218e34d3aa0a8653eaacc2",
     "not_equivalent_to_original_image": true,
     "differences": {
       "swift_files_differing": 18,
       "qwen35_text_template_normalization": "identical",
-      "template_base_opt_in_list_content": "Only agent_sft has this opt-in behavior; launcher forces its recorded default off.",
-      "tp_pp_fsdp_fixes": "bt_sft adds TP-replicated SwiGLU handling and PP mesh/output fixes; the selected topology is TP1/PP1. These changes were not imported.",
-      "fla_autotune": "bt_sft adds default-enabled autotune pinning that may affect runtime or numerical behavior. Its presence in the original image is unproven and it was not imported.",
+      "template_base_opt_in_list_content": "Only the imported snapshot has this opt-in behavior; launcher forces its recorded default off.",
+      "tp_pp_fsdp_fixes": "The comparison source adds TP-replicated SwiGLU handling and PP mesh/output fixes; the selected topology is TP1/PP1. These changes were not imported.",
+      "fla_autotune": "The comparison source adds default-enabled autotune pinning that may affect runtime or numerical behavior. Its presence in the original image is unproven and it was not imported.",
       "other_differences": "Private Lance/Iceberg/HDFS/video storage additions are not imported."
-    }
+    },
+    "original_training_job_source": "mutable training image",
+    "comparison_only_development_head": "ab8b8ec214c9331359218e34d3aa0a8653eaacc2"
   },
   "publication_adaptations": [
     "Replace private filesystem and scheduler assumptions with explicit local model, annotated data, checkpoint and output arguments.",
@@ -114,7 +114,8 @@
     "Make export --model authoritative before model initialization and set BASE_MODEL to the same validated local directory; retain other checkpoint configuration fields.",
     "Declare and preflight the vendored Qwen3.5 loader requirements qwen-vl-utils>=0.0.14 and decord. Their original installed versions are unknown.",
     "Retain source launcher TE preload skip, conditional CUDA13 cuBLAS preload, HTTP pool and GPU visibility defaults, and cache/profiling cleanup. Initialize CUDA_DEVICE_MAX_CONNECTIONS=1 so the existing FSDP initialization changes it to8 in its original order.",
-    "Leave NCCL network interface and RDMA selection to the deployment instead of retaining scheduler-specific eth0/GID3 defaults."
+    "Leave NCCL network interface and RDMA selection to the deployment instead of retaining scheduler-specific eth0/GID3 defaults.",
+    "Remove optional private dataset transforms while retaining explicit unsupported adapters and unchanged standard message preprocessing/cache defaults."
   ],
   "length_tool_published_sha256": "13c6912ac8c61045565707586ef63488d2359da14ccbd01c00d27fb5b50efbc1",
   "tokenizer_provenance": {

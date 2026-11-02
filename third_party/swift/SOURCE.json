@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
   "source": {
-    "project": "tns/swift",
-    "branch": "agent_sft",
+    "project": "modelscope/ms-swift",
     "commit": "06686330164c1221d069d774a0dcb5092a8b2260",
     "distribution": "ms_swift",
-    "version": "4.4.0.dev0"
+    "version": "4.4.0.dev0",
+    "kind": "Axion development snapshot; revision is not a public upstream commit"
   },
   "license": "Apache-2.0",
   "included_scope": [
@@ -63,6 +63,14 @@
     {
       "path": "swift/megatron/arguments/export_args.py",
       "change": "Preserve a non-null explicit model argument when loading native checkpoint configuration, before model initialization; keep every other checkpoint field unchanged. This allows relocating checkpoints without accessing the saved model path. Add a publication change notice. The SFT launcher also sets BASE_MODEL to this validated explicit directory."
+    },
+    {
+      "path": "swift/dataset/preprocessor/aip.py",
+      "change": "Remove optional private guideline and dataset transforms; retain import-compatible adapters that fail explicitly for unsupported formats and joint objectives. Standard MessagesPreprocessor and default cache version are unchanged."
+    },
+    {
+      "path": "swift/template/base.py",
+      "change": "Remove unrelated private experiment references from comments; executable code is unchanged."
     }
   ],
   "integrity": {
@@ -83,7 +91,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "42e787843030fc818483ebdc61cad6610e54e8dea251c98d9e4b43eb2568407e",
+      "sha256": "93fd50af6e6d472f6b0761af8a4398ec06fb3f55990bb6c89997193956256ae4",
       "source_sha256": "fcb77c14dbbba7020164810e7eecd423b236f6889bd2a7c823ce2f24bee53f0b"
     },
     {
@@ -603,7 +611,7 @@
     },
     {
       "path": "swift/dataset/preprocessor/aip.py",
-      "sha256": "ce097f2b41821d304639b2591810eca69d352d359b23cd4680fa3aaca78be4d1",
+      "sha256": "b0f68c57ba0d0e17beb0bbf84d63ffb012fdb75bd0e2f14603f98cd02fd8c1f8",
       "source_sha256": "ce097f2b41821d304639b2591810eca69d352d359b23cd4680fa3aaca78be4d1"
     },
     {
@@ -1893,7 +1901,7 @@
     },
     {
       "path": "swift/template/base.py",
-      "sha256": "8c280bdb2374ca0f24b808174ac140c32e98228c0e06db89dae271c2af41dfc6",
+      "sha256": "ae6c16d96d07d1c9c65f08b3eebb9204b39f7284c90c6355c81fd8b8fc18f2f0",
       "source_sha256": "8c280bdb2374ca0f24b808174ac140c32e98228c0e06db89dae271c2af41dfc6"
     },
     {
@@ -2749,8 +2757,8 @@
   ],
   "runtime_provenance": {
     "record": "../../axion/training/sft/provenance.json",
-    "original_job_branch": "bt_sft",
     "original_image_commit": null,
-    "snapshot_is_not_proven_identical_to_original_image": true
+    "snapshot_is_not_proven_identical_to_original_image": true,
+    "original_job_source": "mutable training image"
   }
 }

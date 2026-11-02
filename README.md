@@ -1,17 +1,14 @@
 <div align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="assets/axion-logo-dark.svg">
-    <img src="assets/axion-logo.svg" width="220" alt="Axion 1.0">
+    <img src="assets/axion-logo.svg" width="260" alt="Axion 1.0">
   </picture>
 
   <h1>Open Agent Foundation Models, Simplified</h1>
 
-  <p><strong>Strong agents. A simpler recipe.</strong></p>
-
   <p>
     <a href="https://axion1-0.github.io/"><img src="https://img.shields.io/badge/Project-Website-2563EB?style=flat-square" alt="Project website"></a>
     <a href="https://axion1-0.github.io/paper/axion.pdf"><img src="https://img.shields.io/badge/Read-Technical_Report-0F766E?style=flat-square" alt="Technical report"></a>
-    <a href="https://github.com/bytedance/axion1_0"><img src="https://img.shields.io/badge/Code-GitHub-181717?style=flat-square&amp;logo=github" alt="Source code"></a>
     <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache_2.0-2563EB?style=flat-square" alt="Apache 2.0 license"></a>
   </p>
 
@@ -33,30 +30,24 @@
 
 ## Highlights
 
-- **A compact training recipe.** Two SFT stages and RL, with no dedicated
-  mid-training, DPO, or on-policy distillation stages.
-- **Strong scientific reasoning.** Axion 1.0-122B achieves **87.0** on
-  FrontierScience Olympiad and **66.7** on FrontierScience Research, alongside
-  **59.0** on full HLE under restricted website access.
-- **Tools as part of the learning problem.** Agents learn to search the web,
-  inspect pages, retrieve scholarly information, and execute Python to acquire
-  evidence and compute answers. Axion 1.0-35B scores **62.2** on SEAL-0.
-- **Verifiable data at both stages.** Model-aware question strengthening
-  develops reasoning; deterministic construction over public data sources
-  establishes reference answers for tool use before a solver attempts a task.
-- **Methods you can inspect and extend.** Follow the process from question
-  generation and trajectory filtering to SFT, asynchronous GRPO, and benchmark
-  preparation and grading.
+- **Three-stage training.** Two stages of supervised fine-tuning (SFT) followed
+  by reinforcement learning (RL), without dedicated mid-training, DPO, or
+  on-policy distillation.
+- **Scientific reasoning and tool use.** Axion 1.0-122B scores **59.0** on full
+  HLE with restricted website access, **87.0** on FrontierScience Olympiad, and
+  **66.7** on FrontierScience Research. Axion 1.0-35B scores **62.2** on SEAL-0.
+- **Verifiable training data.** Reasoning problems are strengthened using
+  feedback from the base model. Tasks requiring tools are constructed from
+  public data sources with programmatically determined reference answers.
+- **Open training code.** The repository includes data generation and
+  filtering, prompts, SFT and RL recipes, and benchmark preparation and grading.
 
-## Benchmark results
+## Results
 
 <p align="center">
   <a href="assets/benchmark-results.png">
     <img src="assets/benchmark-results.png" width="100%" alt="Axion 1.0 compared with selected open and proprietary models on HLE, BioMysteryBench, SEAL-0, HiPhO, and both FrontierScience splits">
   </a>
-</p>
-<p align="center">
-  <em>The project's original comparison figure. Blue: Axion 1.0-122B. Teal: Axion 1.0-35B.</em>
 </p>
 
 Selected results from Table 1 of the
@@ -72,91 +63,69 @@ Selected results from Table 1 of the
 | **Axion 1.0-35B** | **52.2** | **35.3** | **62.2** | **45.7** | **86.0** | **56.7** |
 | **Axion 1.0-122B** | **59.0** | **41.7** | **58.6** | **46.2** | **87.0** | **66.7** |
 
-*BMB: BioMysteryBench, human-difficult subset. FS: FrontierScience. A dash
-denotes an unreported result. An asterisk marks a baseline evaluated by the
-Axion team; other baseline scores in this table come from official reports.*
+BMB denotes the human-difficult subset of BioMysteryBench; FS denotes
+FrontierScience. * marks baselines evaluated by the Axion team; other baseline
+scores are from official reports. — denotes an unreported result.
 
-### Model family
+### Models
 
-| Model | Base model | Total / active parameters | Training |
-|:---|:---|:---:|:---|
-| Axion 1.0-35B | Qwen3.6-35B-A3B | 35B / 3B | SFT I → SFT II → RL |
-| Axion 1.0-122B | Qwen3.5-122B-A10B | 122B / 10B | SFT I → SFT II → RL |
+| Model | Base model | Total / active parameters |
+|:---|:---|:---:|
+| Axion 1.0-35B | Qwen3.6-35B-A3B | 35B / 3B |
+| Axion 1.0-122B | Qwen3.5-122B-A10B | 122B / 10B |
 
-The paper also studies **4B and 9B variants trained with the two SFT stages**,
-without RL, and compares two different 35B initializations. See Section 4.4
-for the results and the limits of comparisons across model sizes.
+Both models use the full SFT and RL recipe. The paper also reports 4B and 9B
+variants trained with SFT only.
 
-**Release status:** code and recipes are available in this repository. Model
-weights and training dataset links are currently marked *Coming soon* on the
+Model weights and training datasets are listed as *Coming soon* on the
 [project website](https://axion1-0.github.io/).
 
-## The recipe
+## Training Recipe
 
-**Establish a question and a verifiable answer first. Collect correct solution
-trajectories second.** Both data pipelines follow this principle.
+Data construction establishes questions and reference answers before collecting
+solution trajectories. Only verified trajectories are retained for SFT.
 
 <p align="center">
   <a href="assets/data-construction.svg">
     <img src="assets/data-construction.svg" width="100%" alt="Two-stage data construction: model-aware strengthening of self-contained reasoning problems, followed by deterministic construction and verification of tool-dependent tasks">
   </a>
 </p>
-<p align="center">
-  <em>Data construction overview from the project website, corresponding to the two pipelines in Section 2 of the paper.</em>
-</p>
 
-### 01 · Learn to reason
+### Stage I: Self-Contained Reasoning
 
-Stage I starts from public scientific and mathematical problems. Composition
-turns a seed's answer into an essential intermediate step in a new problem.
-When the base model solves that problem, its successful solution informs a
-further transformation: **composition, parameterization, range shift, or case
-analysis**. Reference answers are checked again after each rewrite.
+Stage I uses **10,819 trajectories** of scientific and mathematical reasoning.
+Public seed problems are rewritten into harder questions. Problems solved by
+the base model are further strengthened through composition, parameterization,
+range shifts, or case analysis, with reference answers checked after each
+rewrite. Solvers may use Python, but not search or webpage retrieval.
 
-Solvers can use Python but cannot retrieve external information. Only correct,
-complete trajectories with valid tool interactions are retained.
+### Stage II: Tool-Dependent Reasoning
 
-**10,819 trajectories** · [Stage I data construction](datagen/stage1/README.md)
+Stage II uses **7,544 trajectories**, approximately **312M tokens**. Programs
+filter records, select a unique entity, and compute a reference answer before
+an LLM formulates the question. Solvers must find the required evidence through
+tools; construction data and answers are withheld during solving. Questions
+solvable without retrieval are removed.
 
-### 02 · Learn to investigate
+Generators cover individual entities, ranked lists, and chains across
+databases, including the NASA Exoplanet Archive, OurAirports, OpenAlex,
+UniProt, and Ensembl.
 
-Stage II constructs questions over structured public data through
-**filter → select → compute → verbalize**. Deterministic programs identify a
-unique target and establish its reference answer. The construction data and
-answers are withheld during solving, so agents must recover the evidence
-through tools. Questions already solvable without retrieval are filtered out.
+### Reinforcement Learning
 
-The repository includes generators for individual entities, ranked lists, and
-chains across databases, using sources such as the NASA Exoplanet Archive,
-OurAirports, OpenAlex, UniProt, and Ensembl. Intermediate entities and values
-can also serve as verification targets.
+Starting from the Stage II checkpoint, **asynchronous GRPO** trains on agent
+interactions with search, webpage visits, scholarly retrieval, and Python.
+Correct final answers receive full reward; verified intermediate progress can
+receive partial credit. Context condensation divides long rollouts into
+sessions for training.
 
-**7,544 trajectories · approximately 312M tokens** ·
-[Stage II data construction](datagen/stage2/README.md)
+### Training Infrastructure
 
-### 03 · Learn through interaction
-
-Starting from the Stage II checkpoint, **asynchronous GRPO** trains on the
-model's own interactions with search, webpage visits, scholarly retrieval,
-and Python. Correct final answers receive full reward; verified intermediate
-progress can receive partial credit. Context condensation divides long
-rollouts into sessions for training.
-
-[SFT guide](train/sft/README.md) · [RL guide](train/README.md)
-
-## Built to train
-
-The paper's infrastructure supports complete agent trajectories during SFT
-and concurrent environment interaction and policy updates during RL:
-
-- **Long-context SFT:** full-parameter training with a 128K context window,
-  combining FSDP, expert parallelism, and context parallelism.
-- **Asynchronous RL:** separate GPU pools for rollout generation, policy
-  optimization, and auxiliary services, with session-level training for long
-  trajectories.
-- **Consistency between rollout and training:** Token-In-Token-Out (TITO)
-  preserves token IDs, while Rollout Routing Replay (R3) aligns MoE expert
-  choices between the rollout engine and trainer.
+The paper's SFT runs use a 128K context window with FSDP, expert parallelism,
+and context parallelism. RL separates rollout workers, trainers, and auxiliary
+services into distinct GPU pools. Token-In-Token-Out (TITO) preserves token
+IDs, and Rollout Routing Replay (R3) aligns MoE expert choices between rollout
+and training.
 
 Two-stage SFT costs reported in Section 5.1:
 
@@ -165,15 +134,11 @@ Two-stage SFT costs reported in Section 5.1:
 | Axion 1.0-35B | 32 | 1h 02m | 1h 46m | ≈90 |
 | Axion 1.0-122B | 32 | 3h 32m | 3h 58m | 240 |
 
-These measurements describe the paper's **ms-swift / Megatron-FSDP** SFT
-implementation. The SFT entry point bundled here uses **LLaMA-Factory with
-the Megatron backend** and ships **98,304-token** configurations. Follow the
-[SFT guide](train/sft/README.md) for this implementation's parallelism and
-sequence-length constraints.
+These costs are for the paper's ms-swift / Megatron-FSDP implementation.
+The bundled [LLaMA-Factory SFT configurations](train/sft/README.md) use the
+Megatron backend with a 98,304-token sequence limit.
 
-## Getting started
-
-### Install
+## Getting Started
 
 ```bash
 git clone https://github.com/bytedance/axion1_0.git
@@ -190,54 +155,29 @@ pip install -e train/verl                 # RL
 pip install -e train/sft/LlamaFactory     # SFT
 ```
 
-`requirements.txt` pins the shared Python environment. GPU training also needs
-the CUDA extensions described in the [training guide](train/README.md);
-`transformer_engine` must be built against your CUDA and PyTorch installation.
-HiPhO grading uses a separate dependency prefix, documented in the
-[evaluation guide](eval/README.md).
+Additional CUDA extensions and service credentials are described in the
+[training guide](train/README.md). Build `transformer_engine` against your
+CUDA and PyTorch installation. HiPhO grading requires a separate dependency
+prefix; see the [evaluation guide](eval/README.md).
 
-### Choose your workflow
+### Documentation
 
-| Goal | Start here | What is included |
-|:---|:---|:---|
-| Generate reasoning data | [Stage I](datagen/stage1/README.md) | Seed expansion, model-aware rewrites, answer audits, trajectory filtering |
-| Generate data for tool use | [Stage II](datagen/stage2/README.md) | Database generators, paraphrasing, closed-book filtering, scoring, repair and compression |
-| Run supervised fine-tuning | [SFT](train/sft/README.md) | Two-stage configs, data validation, checkpoint handoff |
-| Train with reinforcement learning | [RL](train/README.md) | 35B/122B recipes, tool services, asynchronous GRPO, cache management |
-| Prepare and grade evaluations | [Evaluation](eval/README.md) | FrontierScience Olympiad/Research, HiPhO, HLE-130, and SEAL-0 |
+| Guide | Contents |
+|:---|:---|
+| [Stage I data](datagen/stage1/README.md) | Problem generation, rewriting, answer verification, and trajectory filtering |
+| [Stage II data](datagen/stage2/README.md) | Database generators, question filtering, scoring, and trajectory processing |
+| [SFT](train/sft/README.md) | Data validation and two-stage training configurations |
+| [RL](train/README.md) | 35B/122B recipes, tool services, and asynchronous GRPO |
+| [Evaluation](eval/README.md) | Dataset preparation and grading for FrontierScience, HiPhO, HLE-130, and SEAL-0 |
 
-Rollout collection uses an external agent harness; the repository documents
-the expected tools and rollout format. Benchmark question sets are prepared
-from their sources rather than bundled here. BMB results are reported in the
-paper; its evaluation pipeline is not included in this repository.
-
-<details>
-<summary><strong>Configure service credentials</strong></summary>
-
-Search, page fetching, and judge models use external services. Supply their
-keys through environment variables or a local file you source:
-
-```bash
-# ~/.axion_keys
-export SERPER_KEY_ID=...        # serper.dev: search and scholarly retrieval
-export JINA_API_KEYS=...        # jina.ai: page fetching; comma-separated keys
-export OPENAI_API_KEY=...       # generation, verification, or judge endpoint
-```
-
-Each data guide specifies its own tool requirements. The
-[RL guide](train/README.md) covers sandbox, search, judge, and summarizer
-services; the [evaluation guide](eval/README.md) covers grading endpoints.
-
-</details>
+Evaluation scripts prepare datasets and grade rollouts collected with an
+external agent harness. The evaluation guide documents the required format.
 
 ## License
 
 [Apache 2.0](LICENSE).
 
 ## Citation
-
-If you use Axion's models, methods, or code in your research, please cite the
-[technical report](https://axion1-0.github.io/paper/axion.pdf):
 
 ```bibtex
 @techreport{jia2026axion,
@@ -248,10 +188,4 @@ If you use Axion's models, methods, or code in your research, please cite the
   url    = {https://axion1-0.github.io/paper/axion.pdf}
 }
 ```
-
-<p align="center">
-  <a href="https://axion1-0.github.io/">Project Website</a> ·
-  <a href="https://axion1-0.github.io/paper/axion.pdf">Technical Report</a> ·
-  <a href="#">Back to Top ↑</a>
-</p>
 

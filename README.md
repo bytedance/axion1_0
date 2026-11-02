@@ -16,13 +16,18 @@
   </p>
 
   <p>
-    Yuqi Jia<sup>1</sup> · Yunjie Tian<sup>2,†</sup> · Jiayu Zheng<sup>2</sup><br>
-    Yijun Liang<sup>3</sup> · Jingchen Sun<sup>4</sup> · Mengyu Zhao<sup>2</sup> · Di Fu<sup>2</sup>
+    <a href="https://jyqhahah.github.io/">Yuqi Jia</a><sup>1</sup> · <a href="https://sunsmarterjie.github.io/">Yunjie Tian</a><sup>2,†</sup> · <a href="https://www.linkedin.com/in/jiayu-zheng-5aa231250/">Jiayu Zheng</a><sup>2</sup><br>
+    <a href="https://joliang17.github.io/">Yijun Liang</a><sup>3</sup> · <a href="https://jingchensun.github.io/">Jingchen Sun</a><sup>4</sup> · <a href="https://www.linkedin.com/in/mengyu-zhao-7ab19274/">Mengyu Zhao</a><sup>2</sup> · Di Fu<sup>2</sup>
   </p>
   <p>
     <sup>1</sup> Duke University &nbsp; <sup>2</sup> ByteDance<br>
     <sup>3</sup> University of Maryland, College Park &nbsp; <sup>4</sup> University at Buffalo<br>
     <sup>†</sup> Project Lead
+  </p>
+  <p>
+    <strong>Correspondence:</strong>
+    <a href="mailto:yuqi.jia@duke.edu">Yuqi Jia</a> ·
+    <a href="mailto:tianyunjie96@gmail.com">Yunjie Tian</a>
   </p>
 
   <p>
@@ -170,18 +175,6 @@ progress can receive partial credit. Context condensation divides long
 rollouts into sessions for training.
 
 [SFT guide](train/sft/README.md) · [RL guide](train/README.md)
-
-```mermaid
-flowchart LR
-    B["Qwen base model"] --> S1["SFT I<br/>Self-contained reasoning"]
-    S1 --> S2["SFT II<br/>Reasoning with tools"]
-    S2 --> R["Asynchronous GRPO<br/>Interaction and feedback"]
-    R --> A["Axion 1.0"]
-    style S1 fill:#e8f0fe,stroke:#3b5bb5,color:#152a52
-    style S2 fill:#e5f7f7,stroke:#15999f,color:#123c40
-    style R fill:#eef0ff,stroke:#6366b9,color:#292b59
-    style A fill:#2563eb,stroke:#2563eb,color:#ffffff
-```
 
 ## Built to train
 

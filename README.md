@@ -66,13 +66,10 @@ eval/
 
 ## Licensing
 
-This project is released under the Axion Non-Commercial Research and
-Responsible Use License in `LICENSE`. **Commercial use is prohibited**, and
-Schedule A of that license sets out binding acceptable-use and safety
-conditions.
+This project's own code and associated documentation are released under the
+[Apache License, Version 2.0](LICENSE).
 
-`LICENSE` covers this project's own materials. The vendored third-party
-components keep their own licenses and are not restricted by it —
-`THIRD_PARTY.md` lists which paths those are, where they come from, and which
-files were modified.
+Vendored third-party components retain their original licenses and notices.
+[THIRD_PARTY.md](THIRD_PARTY.md) lists their paths, sources, licenses, and
+modifications.
 

@@ -1,11 +1,9 @@
 # Third-party components
 
-The Axion Non-Commercial Research and Responsible Use License in `LICENSE`
-covers this project's own materials. Under Section 1.3 of that license, the
-components listed here are **not** Covered Materials: they are third-party
-works redistributed under their own terms, and nothing in `LICENSE` restricts
-your rights in them. The same components can be obtained directly from their
-upstream projects under those terms.
+This project's own code and associated documentation are released under the
+Apache License, Version 2.0, in `LICENSE`. The third-party components listed
+below retain their original licenses and notices. They can also be obtained
+directly from their upstream projects under those terms.
 
 | Path | Project | License |
 |---|---|---|
@@ -32,10 +30,10 @@ directory is this project's own code and adapts to them.
 and none carries non-commercial terms. PyTorch (BSD-3-Clause) is installed
 separately from the CUDA wheel index.
 
-Two packages are deliberately left out of the pinned set because their
-licenses do not fit this project's terms. Both imports are guarded and the
-code works without them; install them yourself, under their own licenses, if
-you need the optional features:
+Two optional packages are left out of the pinned set and have separate
+license requirements. Both imports are guarded and the code works without
+them; install them yourself, under their own licenses, if you need the
+optional features:
 
 - PyMuPDF (AGPL-3.0 or a paid commercial license) — PDF parsing in
   `obj_task_eval`

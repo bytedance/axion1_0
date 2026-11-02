@@ -1,351 +1,202 @@
-Axion Non-Commercial Research and Responsible Use License
-Version 1.0
-Effective date: 10/15/2026
-Licensor: ByteDance Ltd.
-Copyright notice: Copyright (c) 2026 ByteDance. All rights reserved.
 
-1. Definitions and Scope
+                                 Apache License
+                           Version 2.0, January 2004
+                        http://www.apache.org/licenses/
 
-1.1. "Agreement" means this Axion Non-Commercial Research and Responsible Use
-License, Version 1.0, including Schedule A (Acceptable Use and Safety Policy),
-which forms an integral and binding part of this Agreement.
-1.2. "Licensor" means the ByteDance legal entity named above, acting only in
-respect of intellectual-property rights that it owns or is authorized to
-license.
-1.3. "Covered Materials" means the following materials expressly identified by
-Licensor as released under this Agreement:
-(a) "Paper": research papers, manuscripts, technical reports, figures, tables,
-and supplementary materials associated with the Axion project, but only to the
-extent Licensor possesses the rights necessary to license them under this
-Agreement;
-(b) "Code": Axion source code, scripts, configurations, training and inference
-software, evaluation code, and associated documentation distributed by
-Licensor; and
-(c) "Models": Axion model architectures as embodied in distributed materials,
-model weights, checkpoints, tokenizers, and model-related files distributed by
-Licensor.
-"Covered Materials" does not include third-party libraries, datasets,
-pretrained components, third-party papers, or other materials identified as
-subject to separate terms. Merely referencing another work does not bring that
-work within this Agreement.
-1.4. "Derivative Materials" means versions of Covered Materials that are
-modified, adapted, fine-tuned, quantized, pruned, merged, or otherwise
-transformed, and models distilled from the Models or developed using their
-outputs as training signals. This definition describes the contractual scope of
-permitted use; it does not imply that Licensor owns copyrights in independently
-protectable contributions or in content in which no such rights exist.
-1.5. "Outputs" means text, images, code, data, actions, or other results
-produced through use of the Code or Models, including results produced when
-those systems use external tools.
-1.6. "Non-Commercial Research Purposes" means independent academic research,
-education, personal learning, reproducibility studies, scientific evaluation,
-and responsible AI safety research that are not conducted for, directed toward,
-or intended to provide a direct or indirect commercial advantage or financial
-benefit to a business or other commercial undertaking.
-1.7. "Commercial Use" means any use, exploitation, or distribution for a
-business purpose or direct or indirect commercial advantage, whether or not
-fees are charged or revenue is immediately generated. It includes, without
-limitation: use by or on behalf of a for-profit organization in its business or
-internal research; product development, commercialization, and market
-evaluation; use in paid or ad-supported products or services; API, hosted, or
-model-as-a-service offerings; customer or client work; commercial training,
-fine-tuning, or distillation; paid licensing or resale; and use under an
-arrangement designed to give a commercial sponsor exclusive or preferential
-business benefit.
-Ordinary personal activity by an individual employed by a business is not
-automatically Commercial Use if undertaken independently, without employer
-direction or resources, and without a commercial purpose. Using ordinary paid
-computing, storage, or repository-hosting services to carry out otherwise
-permitted non-commercial research does not, by itself, turn the Licensee's
-research into Commercial Use; however, this sentence grants no right to any
-service provider to independently exploit the Covered Materials commercially.
-1.8. "You" or "Licensee" means the individual or entity exercising rights under
-this Agreement. If an individual acts on behalf of an entity, that entity must
-independently be eligible to accept and comply with this Agreement.
+   TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION
 
-2. Acceptance and Conditions
+   1. Definitions.
 
-2.1. By downloading, copying, modifying, distributing, or using any Covered
-Materials in circumstances requiring Licensor's permission, You accept this
-Agreement. If You do not agree, You must not exercise rights offered only under
-this Agreement.
-2.2. The restrictions in Sections 3-6 and Schedule A are express conditions of
-the license grant, as well as obligations of Licensee to the extent enforceable
-under applicable law.
-2.3. Nothing in this Agreement limits rights that cannot lawfully be
-restricted, including applicable copyright exceptions, fair use or fair
-dealing, and the right to refer to facts, ideas, or scientific findings not
-protected by copyright. No rights are granted to materials Licensor does not
-control.
+      "License" shall mean the terms and conditions for use, reproduction,
+      and distribution as defined by Sections 1 through 9 of this document.
 
-3. Limited Non-Commercial License Grant
+      "Licensor" shall mean the copyright owner or entity authorized by
+      the copyright owner that is granting the License.
 
-3.1. Subject to continuous compliance with this Agreement, Licensor grants You
-a worldwide, non-exclusive, non-transferable, royalty-free copyright license,
-for the term of the applicable copyright, solely for Non-Commercial Research
-Purposes, to:
-(a) access, read, reproduce, and study the Paper;
-(b) download, install, run, test, evaluate, reproduce, and modify the Code and
-Models;
-(c) create Derivative Materials for Non-Commercial Research Purposes; and
-(d) reproduce and redistribute the Covered Materials and permitted Derivative
-Materials in accordance with Section 5.
-3.2. The grant extends only to rights held or licensable by Licensor. No
-sublicensing right is granted. Each downstream recipient must rely on its own
-permission under this Agreement.
-3.3. No commercial license, patent license, trademark license, data license, or
-other right is granted by implication, estoppel, or otherwise. Any additional
-rights require separate express written authorization from the applicable
-rights holder.
+      "Legal Entity" shall mean the union of the acting entity and all
+      other entities that control, are controlled by, or are under common
+      control with that entity. For the purposes of this definition,
+      "control" means (i) the power, direct or indirect, to cause the
+      direction or management of such entity, whether by contract or
+      otherwise, or (ii) ownership of fifty percent (50%) or more of the
+      outstanding shares, or (iii) beneficial ownership of such entity.
 
-4. Strict Prohibition of Commercial Use
+      "You" (or "Your") shall mean an individual or Legal Entity
+      exercising permissions granted by this License.
 
-4.1. Commercial Use of the Paper, Code, Models, or Derivative Materials is
-prohibited without Licensor's prior express written authorization. Attribution,
-publication of evaluation results, or making an offering available without
-charge does not by itself make a commercial activity permissible.
-4.2. You must not use, deploy, incorporate, distribute, sell, license, or
-otherwise exploit any Covered Materials or Derivative Materials in or for any
-commercial product, service, research program, customer engagement, or business
-operation, including internal commercial research and evaluation.
-4.3. As a separate undertaking by each Licensee using the Models or Code, You
-also agree not to commercially exploit Outputs, including by selling them,
-incorporating them into paid or commercial services, or using them to develop
-or improve commercially deployed models or systems, unless separately
-authorized in writing by Licensor. This contractual obligation does not assert
-that Licensor necessarily owns copyright in every Output or bind persons who
-have not accepted this Agreement.
-4.4. Commercial reproduction, republication, adaptation, or distribution of the
-Paper as a protected work is not licensed. This provision does not purport to
-prohibit lawful citation, reporting of uncopyrightable facts, independent
-implementation of published ideas, or uses permitted by mandatory law.
-4.5. Licensor may consider requests for commercial authorization at its sole
-discretion. No authorization is effective unless documented in a separate
-writing executed by an authorized Licensor representative.
+      "Source" form shall mean the preferred form for making modifications,
+      including but not limited to software source code, documentation
+      source, and configuration files.
 
-5. Redistribution, Attribution, and Derivative Materials
+      "Object" form shall mean any form resulting from mechanical
+      transformation or translation of a Source form, including but
+      not limited to compiled object code, generated documentation,
+      and conversions to other media types.
 
-5.1. For any permitted redistribution of Covered Materials or Derivative
-Materials, You must:
-(a) retain all applicable copyright, ownership, attribution, and disclaimer
-notices;
-(b) provide recipients with a complete copy of this Agreement, including
-Schedule A, and identify the applicable license version;
-(c) conspicuously identify any modifications You made, without implying that
-Licensor reviewed or endorsed them;
-(d) identify relevant Axion source repositories or publications, when
-reasonably practicable; and
-(e) ensure Your distribution is limited to Non-Commercial Research Purposes and
-does not purport to grant rights inconsistent with this Agreement.
-5.2. To the extent Derivative Materials incorporate or are created through
-licensed use of Covered Materials or Outputs, You must not distribute them for
-Commercial Use, or represent that recipients may commercially use them by
-virtue of this Agreement. You may license Your own independent contributions
-separately only insofar as doing so does not expand rights in Covered Materials
-or relieve You of Your obligations hereunder.
-5.3. If You publish research results obtained through use of the Code or
-Models, provide reasonable academic attribution to the Axion project and its
-applicable paper or repository. Non-commercial scholarly publication of
-independently written findings is permitted under this Agreement; any separate
-rights required to reproduce the Paper or other Covered Materials in commercial
-publications must be obtained from the appropriate rights holders.
-5.4. You must not remove, conceal, or misrepresent Licensor's ownership notices
-or use ByteDance or Axion names, logos, or trademarks to suggest sponsorship or
-endorsement.
+      "Work" shall mean the work of authorship, whether in Source or
+      Object form, made available under the License, as indicated by a
+      copyright notice that is included in or attached to the work
+      (an example is provided in the Appendix below).
 
-6. Mandatory Responsible-Use and Safety Conditions
+      "Derivative Works" shall mean any work, whether in Source or Object
+      form, that is based on (or derived from) the Work and for which the
+      editorial revisions, annotations, elaborations, or other modifications
+      represent, as a whole, an original work of authorship. For the purposes
+      of this License, Derivative Works shall not include works that remain
+      separable from, or merely link (or bind by name) to the interfaces of,
+      the Work and Derivative Works thereof.
 
-6.1. You must comply with Schedule A: Acceptable Use and Safety Policy.
-Compliance with Schedule A is an express condition of all permissions under
-this Agreement.
-6.2. You must not knowingly enable, facilitate, or authorize a third party to
-engage in conduct that would violate Schedule A if performed by You.
-Distribution of materials with the purpose of circumventing these conditions is
-prohibited.
-6.3. Before making any Derivative Model, tool-enabled agent, or application
-available to others, You must conduct reasonable safety testing appropriate to
-its capabilities and foreseeable misuse, provide suitable human oversight and
-access controls, and clearly disclose significant known limitations relevant to
-safe use.
-6.4. Legitimate safety evaluation, controlled red-teaming, and defensive
-research are permitted only where they are authorized, non-commercial,
-conducted with appropriate safeguards, and do not constitute the actual harmful
-conduct prohibited in Schedule A.
+      "Contribution" shall mean any work of authorship, including
+      the original version of the Work and any modifications or additions
+      to that Work or Derivative Works thereof, that is intentionally
+      submitted to Licensor for inclusion in the Work by the copyright owner
+      or by an individual or Legal Entity authorized to submit on behalf of
+      the copyright owner. For the purposes of this definition, "submitted"
+      means any form of electronic, verbal, or written communication sent
+      to the Licensor or its representatives, including but not limited to
+      communication on electronic mailing lists, source code control systems,
+      and issue tracking systems that are managed by, or on behalf of, the
+      Licensor for the purpose of discussing and improving the Work, but
+      excluding communication that is conspicuously marked or otherwise
+      designated in writing by the copyright owner as "Not a Contribution."
 
-7. Intellectual Property and Third-Party Rights
+      "Contributor" shall mean Licensor and any individual or Legal Entity
+      on behalf of whom a Contribution has been received by Licensor and
+      subsequently incorporated within the Work.
 
-7.1. All right, title, and interest in the original ByteDance-owned Code and
-Models remain with Licensor or the applicable ByteDance rights holder. No
-ownership transfers to Licensee under this Agreement.
-7.2. Rights in the Paper depend on applicable author, employer, publisher, and
-third-party agreements. This Agreement applies to the Paper only to the extent
-expressly designated and validly licensed by the relevant rights holder. If a
-Paper is separately released under another binding license, this Agreement does
-not override that existing grant.
-7.3. Nothing in this Agreement assigns to Licensor ownership of Licensee's
-independently protectable contributions or automatically assigns ownership of
-Outputs. Any limitations regarding Outputs or Derived Materials operate as
-contractual conditions on Licensee's use of Covered Materials to the extent
-permitted by law.
-7.4. You are responsible for complying with licenses and rights affecting
-third-party components, datasets, dependencies, and external services. This
-Agreement does not grant rights to such materials.
+   2. Grant of Copyright License. Subject to the terms and conditions of
+      this License, each Contributor hereby grants to You a perpetual,
+      worldwide, non-exclusive, no-charge, royalty-free, irrevocable
+      copyright license to reproduce, prepare Derivative Works of,
+      publicly display, publicly perform, sublicense, and distribute the
+      Work and such Derivative Works in Source or Object form.
 
-8. Legal Compliance and Risk Allocation
+   3. Grant of Patent License. Subject to the terms and conditions of
+      this License, each Contributor hereby grants to You a perpetual,
+      worldwide, non-exclusive, no-charge, royalty-free, irrevocable
+      (except as stated in this section) patent license to make, have made,
+      use, offer to sell, sell, import, and otherwise transfer the Work,
+      where such license applies only to those patent claims licensable
+      by such Contributor that are necessarily infringed by their
+      Contribution(s) alone or by combination of their Contribution(s)
+      with the Work to which such Contribution(s) was submitted. If You
+      institute patent litigation against any entity (including a
+      cross-claim or counterclaim in a lawsuit) alleging that the Work
+      or a Contribution incorporated within the Work constitutes direct
+      or contributory patent infringement, then any patent licenses
+      granted to You under this License for that Work shall terminate
+      as of the date such litigation is filed.
 
-8.1. You must comply with all applicable laws and regulations, including those
-relating to privacy, data protection, intellectual property, export controls,
-sanctions, security, consumer protection, and AI systems.
-8.2. You are responsible for obtaining necessary permissions and consents for
-any data, prompts, tools, systems, and third-party materials used in connection
-with Covered Materials, and for protecting personal, confidential, and
-sensitive information.
-8.3. Licensor has no obligation to provide maintenance, updates, support,
-hosted access, safety monitoring, or corrective action for any release.
+   4. Redistribution. You may reproduce and distribute copies of the
+      Work or Derivative Works thereof in any medium, with or without
+      modifications, and in Source or Object form, provided that You
+      meet the following conditions:
 
-9. Termination
+      (a) You must give any other recipients of the Work or
+          Derivative Works a copy of this License; and
 
-9.1. Your rights under this Agreement terminate automatically upon Your breach
-of any license condition, including the prohibition on Commercial Use or any
-provision of Schedule A, subject to limitations imposed by applicable law.
-9.2. Upon termination, You must immediately cease unlicensed access, use,
-modification, and distribution of the Covered Materials and related Derivative
-Materials and, within 30 days, delete or destroy copies in Your control, except
-to the extent retention is required by law. Any legally required retained
-copies must not be used or distributed except as permitted by law.
-9.3. Termination does not eliminate liabilities arising before termination and
-does not terminate independent permissions validly granted by Licensor to
-compliant third parties. Sections 4.3 (as to Outputs created before
-termination), 7, 9, 10, 11, 12, and 13 survive to the extent legally
-applicable.
+      (b) You must cause any modified files to carry prominent notices
+          stating that You changed the files; and
 
-10. Disclaimer of Warranties
+      (c) You must retain, in the Source form of any Derivative Works
+          that You distribute, all copyright, patent, trademark, and
+          attribution notices from the Source form of the Work,
+          excluding those notices that do not pertain to any part of
+          the Derivative Works; and
 
-TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, THE COVERED MATERIALS ARE
-PROVIDED "AS IS" AND "AS AVAILABLE," WITHOUT WARRANTIES OR CONDITIONS OF ANY
-KIND, WHETHER EXPRESS, IMPLIED, OR STATUTORY, INCLUDING MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE, TITLE, NON-INFRINGEMENT, ACCURACY, SECURITY,
-OR RELIABILITY. LICENSOR DOES NOT WARRANT THAT THE MATERIALS OR OUTPUTS ARE
-SAFE, ERROR-FREE, SUITABLE FOR HIGH-STAKES USE, OR COMPLIANT WITH ANY
-PARTICULAR LAW.
+      (d) If the Work includes a "NOTICE" text file as part of its
+          distribution, then any Derivative Works that You distribute must
+          include a readable copy of the attribution notices contained
+          within such NOTICE file, excluding those notices that do not
+          pertain to any part of the Derivative Works, in at least one
+          of the following places: within a NOTICE text file distributed
+          as part of the Derivative Works; within the Source form or
+          documentation, if provided along with the Derivative Works; or,
+          within a display generated by the Derivative Works, if and
+          wherever such third-party notices normally appear. The contents
+          of the NOTICE file are for informational purposes only and
+          do not modify the License. You may add Your own attribution
+          notices within Derivative Works that You distribute, alongside
+          or as an addendum to the NOTICE text from the Work, provided
+          that such additional attribution notices cannot be construed
+          as modifying the License.
 
-11. Limitation of Liability; Indemnity
+      You may add Your own copyright statement to Your modifications and
+      may provide additional or different license terms and conditions
+      for use, reproduction, or distribution of Your modifications, or
+      for any such Derivative Works as a whole, provided Your use,
+      reproduction, and distribution of the Work otherwise complies with
+      the conditions stated in this License.
 
-11.1. TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, LICENSOR AND ITS
-AFFILIATES, OFFICERS, EMPLOYEES, AND CONTRIBUTORS WILL NOT BE LIABLE FOR
-INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, EXEMPLARY, OR PUNITIVE DAMAGES,
-OR FOR LOST PROFITS, DATA, BUSINESS, OR GOODWILL, ARISING OUT OF THIS AGREEMENT
-OR USE OF COVERED MATERIALS, REGARDLESS OF THE THEORY OF LIABILITY.
-11.2. TO THE MAXIMUM EXTENT PERMITTED BY LAW, LICENSOR'S AGGREGATE LIABILITY
-ARISING OUT OF OR RELATING TO THIS AGREEMENT WILL NOT EXCEED USD 100. Nothing
-in this Section excludes liability that cannot lawfully be excluded or limited.
-11.3. To the extent permitted by applicable law, You agree to defend and
-indemnify Licensor and its affiliates against third-party claims and reasonable
-resulting costs arising from Your unlawful use, prohibited Commercial Use,
-violation of Schedule A, or breach of third-party rights in connection with the
-Covered Materials, except to the extent caused by Licensor's own unlawful
-conduct.
+   5. Submission of Contributions. Unless You explicitly state otherwise,
+      any Contribution intentionally submitted for inclusion in the Work
+      by You to the Licensor shall be under the terms and conditions of
+      this License, without any additional terms or conditions.
+      Notwithstanding the above, nothing herein shall supersede or modify
+      the terms of any separate license agreement you may have executed
+      with Licensor regarding such Contributions.
 
-12. No Endorsement; No Patent Grant
+   6. Trademarks. This License does not grant permission to use the trade
+      names, trademarks, service marks, or product names of the Licensor,
+      except as required for reasonable and customary use in describing the
+      origin of the Work and reproducing the content of the NOTICE file.
 
-12.1. No permission is granted to use ByteDance's or Axion's trademarks, logos,
-or names except for accurate attribution and identification as required by this
-Agreement or permitted by law.
-12.2. No patent license or patent non-assertion commitment is granted under
-this Agreement. Any patent permission must be separately and expressly granted
-in writing by the appropriate rights holder.
+   7. Disclaimer of Warranty. Unless required by applicable law or
+      agreed to in writing, Licensor provides the Work (and each
+      Contributor provides its Contributions) on an "AS IS" BASIS,
+      WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+      implied, including, without limitation, any warranties or conditions
+      of TITLE, NON-INFRINGEMENT, MERCHANTABILITY, or FITNESS FOR A
+      PARTICULAR PURPOSE. You are solely responsible for determining the
+      appropriateness of using or redistributing the Work and assume any
+      risks associated with Your exercise of permissions under this License.
 
-13. General Terms
+   8. Limitation of Liability. In no event and under no legal theory,
+      whether in tort (including negligence), contract, or otherwise,
+      unless required by applicable law (such as deliberate and grossly
+      negligent acts) or agreed to in writing, shall any Contributor be
+      liable to You for damages, including any direct, indirect, special,
+      incidental, or consequential damages of any character arising as a
+      result of this License or out of the use or inability to use the
+      Work (including but not limited to damages for loss of goodwill,
+      work stoppage, computer failure or malfunction, or any and all
+      other commercial damages or losses), even if such Contributor
+      has been advised of the possibility of such damages.
 
-13.1. Governing law and forum: [INSERT GOVERNING LAW AND EXCLUSIVE OR
-NON-EXCLUSIVE FORUM AS APPROVED BY BYTEDANCE LEGAL].
-13.2. If any provision is held unenforceable, it will be limited to the minimum
-extent necessary, and the remaining provisions will continue in effect where
-legally permissible.
-13.3. This Agreement is the complete license offered for the specifically
-designated Covered Materials. Separate commercial licenses, third-party
-notices, and mandatory legal rights are not displaced by this Agreement.
-13.4. Licensor may publish new license versions for future releases. A later
-version does not automatically replace the version attached to a prior release
-unless Licensee separately agrees or applicable law requires otherwise.
-13.5. Headings are for convenience. The words "including" and "such as" are
-illustrative and not exhaustive.
+   9. Accepting Warranty or Additional Liability. While redistributing
+      the Work or Derivative Works thereof, You may choose to offer,
+      and charge a fee for, acceptance of support, warranty, indemnity,
+      or other liability obligations and/or rights consistent with this
+      License. However, in accepting such obligations, You may act only
+      on Your own behalf and on Your sole responsibility, not on behalf
+      of any other Contributor, and only if You agree to indemnify,
+      defend, and hold each Contributor harmless for any liability
+      incurred by, or claims asserted against, such Contributor by reason
+      of your accepting any such warranty or additional liability.
 
+   END OF TERMS AND CONDITIONS
 
-Schedule A - Acceptable Use and Safety Policy
+   APPENDIX: How to apply the Apache License to your work.
 
-This Schedule A is part of the License, not an optional set of
-recommendations. You must not use or knowingly enable others to use Covered
-Materials, Derivative Materials, or tools and applications built with them for
-any of the following purposes:
+      To apply the Apache License to your work, attach the following
+      boilerplate notice, with the fields enclosed by brackets "[]"
+      replaced with your own identifying information. (Don't include
+      the brackets!)  The text should be enclosed in the appropriate
+      comment syntax for the file format. We also recommend that a
+      file or class name and description of purpose be included on the
+      same "printed page" as the copyright notice for easier
+      identification within third-party archives.
 
-A1. Illegal acts and violations of rights. Committing, facilitating, planning,
-or materially assisting unlawful acts; violating intellectual-property,
-privacy, data-protection, confidentiality, or other applicable legal rights; or
-obtaining access to systems or information without authorization.
-A2. Violence and dangerous capabilities. Facilitating terrorism, violent
-extremism, violent crime, or serious physical harm; developing, acquiring, or
-deploying unlawful weapons; or materially enabling the design, acquisition, or
-misuse of chemical, biological, radiological, or nuclear weapons or other
-capabilities intended to cause mass harm.
-A3. Child exploitation and sexual abuse. Creating, distributing, soliciting, or
-facilitating child sexual abuse material, sexual exploitation or abuse of
-minors, human trafficking, non-consensual intimate imagery, or sexual violence.
-A4. Malicious cyber activity. Unauthorized intrusion, credential theft, malware
-deployment, destructive cyber operations, unauthorized surveillance of
-networks, exfiltration of information, or automation of such conduct.
-Authorized security testing in controlled environments is permitted under
-Section 6.4 only when it does not cause unauthorized harm.
-A5. Privacy-invasive identification or surveillance. Unlawful collection,
-disclosure, profiling, tracking, or identification of individuals;
-non-consensual biometric identification or sensitive-personal-data processing;
-or mass surveillance in violation of human rights or applicable law.
-A6. Fraud, deception, manipulation, and harassment. Scams, identity theft,
-deceptive impersonation, targeted intimidation, stalking, harassment, or
-deliberate misinformation that foreseeably creates significant real-world harm;
-or manipulation designed to undermine individuals' informed decision-making in
-consequential settings.
-A7. Discrimination and denial of rights. Unlawful discrimination, persecution,
-or targeting of persons based on protected or sensitive characteristics; or
-systems designed to deny rights or opportunities on an unlawful discriminatory
-basis.
-A8. Unsafe high-stakes decision-making. Using a Model as an unsupervised or
-final decision-maker in medical care, mental health crisis response, legal
-determinations, employment, housing, credit, insurance, education admissions,
-migration, policing, or other consequential decisions affecting individuals'
-rights, safety, or livelihood. Controlled, non-commercial research on such
-applications is allowed only without real-world consequential deployment and
-with appropriate ethical and legal safeguards.
-A9. Uncontrolled autonomous agents. Deploying agentic systems that autonomously
-access third-party services, execute transactions, alter external systems, or
-take consequential real-world actions without appropriate authorization, access
-scoping, monitoring, human oversight, and emergency-stop mechanisms
-proportionate to the risk.
-A10. Evasion or enabling prohibited uses. Intentionally bypassing safety
-mechanisms, access controls, license restrictions, or evaluations for the
-purpose of enabling a prohibited use; or distributing adaptations specifically
-intended to facilitate the prohibited activities above.
+   Copyright [yyyy] [name of copyright owner]
 
-Minimum Responsible-Use Requirements
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
 
-For every permitted use, You must, as appropriate to the foreseeable risks and
-capabilities involved:
+       http://www.apache.org/licenses/LICENSE-2.0
 
-B1. Evaluate material safety, security, robustness, and misuse risks before
-releasing derivatives or applications.
-B2. Provide meaningful human oversight, authorization controls, rate limits,
-and technical safeguards when enabling tool use or external actions.
-B3. Respect data minimization, confidentiality, security, privacy, and
-applicable retention requirements.
-B4. Document known limitations and avoid representing experimental outputs as
-verified facts, professional advice, or safety guarantees.
-B5. Promptly investigate and mitigate significant safety or security incidents
-within Your control and comply with applicable incident-reporting laws.
-B6. Ensure recipients receive this Agreement, including Schedule A, when
-redistribution is permitted.
-
-Research exception clarification. This Schedule does not prohibit good-faith,
-non-commercial study of safety failures, model bias, harmful-content detection,
-or defensive security when conducted in authorized and appropriately contained
-settings. It does prohibit causing actual harm or deploying prohibited
-capabilities under the pretext of research.
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.

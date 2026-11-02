@@ -1,3 +1,4 @@
+# Modified by the Axion authors: preserve routing prefixes and parameter-version bounds across generation resumes.
 # Copyright 2024 Bytedance Ltd. and/or its affiliates
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -25,12 +26,12 @@ from typing import Any, Optional
 from uuid import uuid4
 
 import ray
-import torch
 from cachetools import LRUCache
 from omegaconf import DictConfig
 
 from verl.single_controller.ray.base import RayResourcePool, RayWorkerGroup
 from verl.utils import normalize_token_ids
+from verl.utils.rollout_routing import merge_routed_experts, update_version_bounds
 from verl.utils.ray_utils import auto_await
 from verl.utils.rollout_trace import rollout_trace_op
 from verl.utils.tracking import RLInsightLogger
@@ -315,6 +316,8 @@ class FullyAsyncLLMServerClient(LLMServerClient):
         Returns:
             TokenOutput: token output
         """
+        # Modified by Axion: retain token routes and version bounds across abort/resume.
+        sampling_params = dict(sampling_params)
         prompt_ids = normalize_token_ids(prompt_ids)
         if _COLLAPSE_IMAGE_BLOCK_IDS is not None and image_data:
             prompt_ids = _collapse_expanded_image_blocks(prompt_ids)
@@ -331,7 +334,9 @@ class FullyAsyncLLMServerClient(LLMServerClient):
             log_probs=[],
             num_preempted=0,
         )
-        min_global_steps, max_global_steps = None, None
+        version_bounds = {}
+        require_routes = self.config.actor_rollout_ref.rollout.enable_rollout_routing_replay
+        require_versions = bool(getattr(getattr(self.config, "async_training", None), "axion_recipe", False))
 
         while True:
             # 1. generate tokens
@@ -350,25 +355,23 @@ class FullyAsyncLLMServerClient(LLMServerClient):
             final_output.token_ids.extend(output.token_ids)
             if output.log_probs is not None:
                 final_output.log_probs.extend(output.log_probs)
-            # On partial rollout resume the model version may differ, so keep
-            # existing routing and only append routing for newly generated tokens.
-            if output.routed_experts is not None and len(output.token_ids) > 0:
-                if final_output.routed_experts is None:
-                    final_output.routed_experts = output.routed_experts
-                else:
-                    final_output.routed_experts = torch.cat(
-                        [final_output.routed_experts, output.routed_experts[-len(output.token_ids) :]],
-                        dim=0,
-                    )
+            final_output.routed_experts = merge_routed_experts(
+                final_output.routed_experts,
+                output.routed_experts,
+                len(prompt_ids) + len(final_output.token_ids) - len(output.token_ids),
+                len(output.token_ids),
+                required=require_routes,
+            )
+            if require_versions and len(output.token_ids) != len(output.log_probs or []):
+                raise ValueError("Rollout token/logprob length mismatch")
             if output.num_preempted is not None:
                 final_output.num_preempted += output.num_preempted
             final_output.stop_reason = output.stop_reason
 
             # update model weights version
             global_steps = output.extra_fields.get("global_steps", None)
-            if min_global_steps is None:
-                min_global_steps = global_steps
-            max_global_steps = global_steps
+            if output.token_ids:
+                update_version_bounds(version_bounds, output.extra_fields, required=require_versions)
 
             # 3. update max_new_tokens
             if original_max_tokens is not None:
@@ -389,8 +392,7 @@ class FullyAsyncLLMServerClient(LLMServerClient):
             await asyncio.sleep(1)
 
         final_output.extra_fields["global_steps"] = global_steps
-        final_output.extra_fields["min_global_steps"] = min_global_steps
-        final_output.extra_fields["max_global_steps"] = max_global_steps
+        final_output.extra_fields.update(version_bounds)
         return final_output
 
 

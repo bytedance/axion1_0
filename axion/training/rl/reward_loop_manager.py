@@ -87,6 +87,7 @@ class DeepResearchRewardLoopManager(NaiveRewardManager):
         # Preserve DeepResearch session-level metadata if present.
         for key in (
             "full_response",
+            "full_messages",
             "session_id",
             "num_sessions",
             "rollout_index",
@@ -143,12 +144,12 @@ class DeepResearchRewardLoopManager(NaiveRewardManager):
         except asyncio.TimeoutError:
             _task_id = extra_info.get("task_id", "unknown")
             logger.warning(
-                "Eval per-response timeout (%.0fs) for task_id=%s data_source=%s. Returning score=0.",
+                "Eval per-response timeout (%.0fs) for task_id=%s data_source=%s. Marking rollout unusable.",
                 _eval_timeout,
                 _task_id,
                 data_source,
             )
-            result = {"score": 0.0, "acc": 0.0, "eval_timeout": True}
+            result = {"score": 0.0, "acc": 0.0, "eval_timeout": True, "drop_from_training": True}
             _eval_timed_out = True
 
         reward_extra_info = {}
@@ -190,6 +191,8 @@ class DeepResearchRewardLoopManager(NaiveRewardManager):
             is_obj = 1.0 - is_openended
             reward_extra_info["score"] = reward
             reward_extra_info["acc"] = acc
+            reward_extra_info["answered"] = self._coerce_metric_scalar(result.get("answered")) or 0.0
+            reward_extra_info["process_score"] = self._coerce_metric_scalar(result.get("process_score")) or 0.0
             reward_extra_info["score_obj"] = base_score if is_obj > 0.0 else 0.0
             reward_extra_info["score_openended"] = base_score if is_openended > 0.0 else 0.0
             reward_extra_info["score_citation"] = citation_score
@@ -211,6 +214,8 @@ class DeepResearchRewardLoopManager(NaiveRewardManager):
             is_obj = 1.0 - is_openended
             reward_extra_info["score"] = reward
             reward_extra_info["acc"] = reward
+            reward_extra_info["answered"] = 0.0
+            reward_extra_info["process_score"] = 0.0
             reward_extra_info["score_obj"] = reward if is_obj > 0.0 else 0.0
             reward_extra_info["score_openended"] = reward if is_openended > 0.0 else 0.0
             reward_extra_info["score_citation"] = 0.0

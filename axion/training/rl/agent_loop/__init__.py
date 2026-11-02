@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# Axion: retain one agent using the current backend partial-generation client.
 from .deepresearch_agent_loop import DeepResearchAgentLoop
-from .deepresearch_async_partial_agent_loop import DeepResearchAsyncPartialAgentLoop
 
-__all__ = ["DeepResearchAgentLoop", "DeepResearchAsyncPartialAgentLoop"]
+__all__ = ["DeepResearchAgentLoop"]

@@ -11,46 +11,25 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""
-DeepResearch Recipe for verl framework.
+# Axion: defer optional training imports so setup and dry runs stay lightweight.
+"""Axion's paper-based reinforcement learning recipe."""
+from importlib import import_module
 
-This recipe implements the DeepResearch agent with:
-- Multi-turn tool calling (search, google_scholar, PythonInterpreter, visit)
-- Memory/condenser system for context compression
-- Task-specific evaluation scripts
-"""
+_EXPORTS = {
+    'DeepResearchAgentLoop': '.agent_loop',
+    'call_condenser_async': '.memory', 'extract_events_from_messages': '.memory',
+    'format_prev_state_section': '.memory', 'parse_memory_result': '.memory',
+    'compute_score': '.reward', 'compute_score_sync': '.reward',
+    'compute_score_wrapper': '.reward', 'compute_score_wrapper_sync': '.reward',
+    'DeepResearchSearchTool': '.tools', 'DeepResearchScholarTool': '.tools',
+    'DeepResearchPythonTool': '.tools', 'DeepResearchVisitTool': '.tools',
+}
+__all__ = list(_EXPORTS)
 
-from .agent_loop import DeepResearchAgentLoop
-from .memory import (
-    call_condenser_async,
-    extract_events_from_messages,
-    format_prev_state_section,
-    parse_memory_result,
-)
-from .reward import (
-    compute_score,
-    compute_score_sync,
-    compute_score_wrapper,
-    compute_score_wrapper_sync,
-)
-from .tools import DeepResearchPythonTool, DeepResearchScholarTool, DeepResearchSearchTool, DeepResearchVisitTool
 
-__all__ = [
-    # Agent loop
-    "DeepResearchAgentLoop",
-    # Memory
-    "call_condenser_async",
-    "extract_events_from_messages",
-    "format_prev_state_section",
-    "parse_memory_result",
-    # Reward
-    "compute_score",
-    "compute_score_sync",
-    "compute_score_wrapper",
-    "compute_score_wrapper_sync",
-    # Tools
-    "DeepResearchSearchTool",
-    "DeepResearchScholarTool",
-    "DeepResearchPythonTool",
-    "DeepResearchVisitTool",
-]
+def __getattr__(name):
+    if name not in _EXPORTS:
+        raise AttributeError(name)
+    value = getattr(import_module(_EXPORTS[name], __name__), name)
+    globals()[name] = value
+    return value

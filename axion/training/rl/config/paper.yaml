@@ -1,0 +1,202 @@
+# Axion 1.0 Sections 3.3/5.2 and Appendix A Table 5.
+# Deployment-specific paths and unreported agent limits are supplied by launcher.py.
+defaults:
+  - ppo_megatron_trainer
+  - _self_
+
+async_training:
+  axion_recipe: true
+  staleness_threshold: 11
+  trigger_parameter_sync_step: 2
+  require_batches: 1
+  partial_rollout: true
+  use_trainer_do_validate: false
+  reward_cancel_mode: save_state
+  checkpoint_engine:
+    enable: true
+    overlap_broadcast_and_consume: false
+    device_buffer_size_M: 1024
+
+rollout:
+  nnodes: 5
+  n_gpus_per_node: 8
+  n: 8
+  total_rollout_steps: null
+  total_epochs: 1
+  test_freq: -1
+
+data:
+  train_files: null
+  val_files: []
+  prompt_key: prompt
+  reward_fn_key: data_source
+  max_prompt_length: 12000
+  max_response_length: 49152
+  train_batch_size: 0
+  gen_batch_size: 1
+  return_raw_chat: true
+  truncation: error
+  filter_overlong_prompts: true
+  custom_cls:
+    path: pkg://axion.training.rl.dataset
+    name: PaperRLHFDataset
+
+actor_rollout_ref:
+  hybrid_engine: false
+  model:
+    path: null
+    tokenizer_path: null
+    use_remove_padding: false
+    use_fused_kernels: false
+    enable_gradient_checkpointing: true
+  actor:
+    strategy: megatron
+    ppo_mini_batch_size: 24
+    ppo_micro_batch_size_per_gpu: 1
+    ppo_epochs: 1
+    use_dynamic_bsz: false
+    ppo_max_token_len_per_gpu: 61152
+    use_rollout_log_probs: true
+    use_kl_loss: true
+    kl_loss_coef: 0.001
+    clip_ratio_low: 0.2
+    clip_ratio_high: 0.28
+    entropy_coeff: 0
+    loss_agg_mode: seq-mean-token-mean
+    use_torch_compile: false
+    optim:
+      lr: 2.0e-6
+      lr_decay_style: constant
+      lr_warmup_steps: 5
+      betas: [0.9, 0.999]
+      weight_decay: 0.1
+      clip_grad: 1.0
+      total_training_steps: null
+      lr_decay_steps: null
+      use_checkpoint_opt_param_scheduler: false
+      override_optimizer_config:
+        optimizer_cpu_offload: true
+        optimizer_offload_fraction: 1.0
+    megatron:
+      dtype: bfloat16
+      use_mbridge: true
+      vanilla_mbridge: true
+      use_dist_checkpointing: true
+      use_remove_padding: false
+      pad_bshd_to_minibatch_max: false
+      param_offload: true
+      grad_offload: true
+      optimizer_offload: true
+      tensor_model_parallel_size: 2
+      pipeline_model_parallel_size: 1
+      context_parallel_size: 1
+      expert_model_parallel_size: 8
+      expert_tensor_parallel_size: 1
+      router_replay:
+        mode: R3
+      override_transformer_config:
+        attention_backend: auto
+        recompute_method: uniform
+        recompute_granularity: full
+        recompute_num_layers: 1
+        gradient_accumulation_fusion: false
+        moe_aux_loss_coeff: 0.0
+        moe_z_loss_coeff: 0.0
+    checkpoint:
+      save_contents: [model, extra, optimizer, hf_model]
+      mbridge_config:
+        distributed_filesystem: true
+        memory_efficient: true
+  ref:
+    log_prob_use_dynamic_bsz: false
+    log_prob_max_token_len_per_gpu: 61152
+    log_prob_micro_batch_size_per_gpu: 1
+    use_torch_compile: false
+    megatron:
+      use_mbridge: true
+      vanilla_mbridge: true
+      use_remove_padding: false
+      pad_bshd_to_minibatch_max: false
+      param_offload: true
+      tensor_model_parallel_size: 2
+      pipeline_model_parallel_size: 1
+      context_parallel_size: 1
+      expert_model_parallel_size: 8
+      expert_tensor_parallel_size: 1
+  rollout:
+    name: vllm
+    mode: async
+    n: 8
+    temperature: 1.0
+    top_p: 1.0
+    top_k: -1
+    dtype: bfloat16
+    calculate_log_probs: true
+    tensor_model_parallel_size: 4
+    max_model_len: 61152
+    max_num_batched_tokens: 61152
+    max_num_seqs: 256
+    gpu_memory_utilization: 0.85
+    enable_chunked_prefill: true
+    enable_rollout_routing_replay: true
+    log_prob_micro_batch_size_per_gpu: 1
+    log_prob_use_dynamic_bsz: false
+    log_prob_max_token_len_per_gpu: 61152
+    checkpoint_engine:
+      backend: nccl
+      update_weights_bucket_megabytes: 2048
+    agent:
+      default_agent_loop: deepresearch_agent
+      agent_loop_config_path: null
+    multi_turn:
+      enable: true
+      max_user_turns: null
+      max_assistant_turns: null
+      max_parallel_calls: 1
+      max_tool_response_length: null
+      tool_response_truncate_side: middle
+      tool_config_path: null
+
+algorithm:
+  adv_estimator: grpo
+  norm_adv_by_std_in_grpo: true
+  use_kl_in_reward: false
+  rollout_correction:
+    bypass_mode: true
+
+trainer:
+  nnodes: 2
+  n_gpus_per_node: 8
+  total_training_steps: null
+  total_epochs: 1
+  val_before_train: false
+  test_freq: -1
+  save_freq: 5
+  resume_mode: disable
+  default_local_dir: null
+  logger: [console]
+  project_name: Axion
+  experiment_name: axion-122b-rl
+
+custom_reward_function:
+  path: null
+  name: compute_paper_score
+reward_manager:
+  source: importlib
+  name: DeepResearchRewardManager
+  module:
+    path: pkg://axion.training.rl.reward_manager
+reward_model:
+  reward_manager: DeepResearchRewardLoopManager
+  enable: false
+  enable_resource_pool: false
+  reward_loop_source: importlib
+  reward_loop_module_path: pkg://axion.training.rl.reward_loop_manager
+  reward_loop_class_name: DeepResearchRewardLoopManager
+
+reward:
+  reward_manager:
+    source: importlib
+    name: DeepResearchRewardLoopManager
+    module:
+      path: pkg://axion.training.rl.reward_loop_manager

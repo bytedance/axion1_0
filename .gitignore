@@ -57,6 +57,8 @@ eval/.hipho_deps/
 # Package builds and local checks
 /build/
 /dist/
+/third_party/*/build/
+/third_party/*/dist/
 .pytest_cache/
 
 # Canonical evaluation paths (eval/ remains a compatibility alias)

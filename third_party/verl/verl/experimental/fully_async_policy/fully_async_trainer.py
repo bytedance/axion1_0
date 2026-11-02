@@ -1,3 +1,4 @@
+# Modified by the Axion authors: paper GRPO session batching, update clocks and checkpoint accounting.
 # Copyright 2025 Meituan Ltd. and/or its affiliates
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,6 +14,7 @@
 # limitations under the License.
 
 import asyncio
+import json
 import logging
 import os
 import time
@@ -149,6 +151,12 @@ class FullyAsyncTrainer(SeparateRayPPOTrainer):
         # required_samples use ppo_mini_batch_size*require_batches as the minimum number of samples.
         self.require_batches = config.async_training.require_batches
         self.required_samples = config.actor_rollout_ref.actor.ppo_mini_batch_size * self.require_batches
+        self.axion_batch_adapter = None
+        self.optimizer_updates = 0
+        if config.async_training.get("axion_recipe", False):
+            from axion.training.rl.async_batch import AxionAsyncBatchAdapter
+
+            self.axion_batch_adapter = AxionAsyncBatchAdapter(config)
         total_gpus = (
             config.trainer.nnodes * config.trainer.n_gpus_per_node
             + config.rollout.nnodes * config.rollout.n_gpus_per_node
@@ -255,6 +263,12 @@ class FullyAsyncTrainer(SeparateRayPPOTrainer):
 
     def set_total_train_steps(self, total_training_steps):
         self.total_train_steps = total_training_steps
+        if self.axion_batch_adapter is not None:
+            # Worker schedulers were initialized from the explicit optimizer-update
+            # target. The progress bar counts published versions (two updates each).
+            self.total_train_steps = self.axion_batch_adapter.target_updates // 2
+            self.progress_bar = tqdm(total=self.total_train_steps, initial=0, desc="Published policy versions")
+            return
 
         try:
             OmegaConf.set_struct(self.config, True)
@@ -280,6 +294,8 @@ class FullyAsyncTrainer(SeparateRayPPOTrainer):
         Returns:
             tuple: (epoch, batch_dict, gen_batch_output)
         """
+        if self.axion_batch_adapter is not None:
+            return await self._get_axion_samples_from_queue()
         print(
             f"[FullyAsyncTrainer] Requesting {self.required_samples} samples from queue",
             flush=True,
@@ -330,6 +346,39 @@ class FullyAsyncTrainer(SeparateRayPPOTrainer):
 
         batch.meta_info["fully_async/total_wait_time"] = total_wait_time
         return 0, batch
+
+    async def _get_axion_samples_from_queue(self):
+        from axion.training.rl.async_batch import collect_prompt_groups
+
+        start = time.time()
+        async def get_decoded_sample():
+            item = await self.message_queue_client.get_sample()
+            if item is None or item[0] is None:
+                return None
+            payload, queue_size = item
+            return ray.cloudpickle.loads(payload), queue_size
+
+        samples, rejected = await collect_prompt_groups(
+            get_decoded_sample,
+            lambda sample: self.axion_batch_adapter.classify(sample, self.current_param_version),
+        )
+        self.axion_batch_adapter.rejected.update(rejected)
+        self.metrics.update({f"fully_async/rejected_groups/{key}": value for key, value in rejected.items()})
+        if samples is None:
+            return None, None
+        # Group normalization has already occurred on the original eight rows.
+        # Balance only after expansion, so session rows and their masks travel together.
+        batch = assemble_batch_from_rollout_samples(samples, self.tokenizer, self.config, None)
+        batch = self.axion_batch_adapter.expand(batch, self)
+        batch.meta_info["fully_async/total_wait_time"] = time.time() - start
+        self.metrics["fully_async/accepted_prompt_groups"] = 24
+        self.metrics["fully_async/trainable_sessions"] = batch.meta_info["axion_real_sessions"]
+        return 0, batch
+
+    def _fit_compute_advantage(self, batch):
+        if self.axion_batch_adapter is not None:
+            return self.axion_batch_adapter.compute_advantage(self, batch)
+        return super()._fit_compute_advantage(batch)
 
     def _create_actor_rollout_classes(self):
         # create actor — always use Role.Actor (not ActorRollout) even when
@@ -399,12 +448,24 @@ class FullyAsyncTrainer(SeparateRayPPOTrainer):
         while True:
             try:
                 await self.fit_step()
+                if (self.axion_batch_adapter is not None
+                        and self.optimizer_updates >= self.axion_batch_adapter.target_updates):
+                    await self.rollouter.stop_generation.remote()
+                    break
             except TrainingStopException:
+                if self.axion_batch_adapter is not None:
+                    raise RuntimeError(
+                        f"Rollout input exhausted after {self.optimizer_updates} optimizer updates; "
+                        f"requested {self.axion_batch_adapter.target_updates}. "
+                        "No incomplete 24-prompt batch was trained."
+                    )
                 print("[FullyAsyncTrainer] Training stopped by queue termination signal")
                 break
 
         self.progress_bar.close()
-        if self.current_param_version % self.config.trainer.test_freq != 0 or self.local_trigger_step > 1:
+        if self.axion_batch_adapter is None and (
+            self.current_param_version % self.config.trainer.test_freq != 0 or self.local_trigger_step > 1
+        ):
             weights_updated = await self._fit_update_weights()
             if weights_updated:
                 self._fit_log_aggregated_training_metrics()
@@ -489,6 +550,8 @@ class FullyAsyncTrainer(SeparateRayPPOTrainer):
         return old_log_prob, old_log_prob_mfu
 
     def _fit_update_local_step(self):
+        if self.axion_batch_adapter is not None:
+            self.optimizer_updates += 1
         time_str = datetime.now().strftime("%H:%M:%S.%f")[:-3]
         print(
             f"[FullyAsyncTrainer] global_steps: {self.global_steps} "
@@ -555,6 +618,8 @@ class FullyAsyncTrainer(SeparateRayPPOTrainer):
         # Skip validation if not needed and not validation before training
         if not need_validate and not val_before_train:
             return
+        if self.axion_batch_adapter is not None and not self.config.data.get("val_files"):
+            raise ValueError("Requested validation requires nonempty data.val_files")
         # Execute validation
         if self.config.async_training.use_trainer_do_validate:
             await self._trainer_side_validate()
@@ -604,6 +669,8 @@ class FullyAsyncTrainer(SeparateRayPPOTrainer):
         print(f"[FullyAsyncTrainer] _trainer_side_validate === END === (total: {total_time:.2f}s)")
 
     def _fit_save_checkpoint(self, force=False):
+        if self.axion_batch_adapter is not None and self.local_trigger_step != 1:
+            return  # The formal recipe checkpoints only published policy versions.
         if self.current_param_version == self.last_ckpt_version:
             return
 
@@ -696,6 +763,22 @@ class FullyAsyncTrainer(SeparateRayPPOTrainer):
                 max_ckpt_to_keep=max_critic_ckpt_to_keep,
             )
         ray.get(self.rollouter.save_checkpoint.remote(local_global_step_folder))
+        if self.axion_batch_adapter is not None:
+            state = {
+                "format_version": 1,
+                "optimizer_updates": self.optimizer_updates,
+                "published_parameter_version": self.current_param_version,
+                "updates_per_parameter_version": self.trigger_parameter_sync_step,
+                "next_local_trigger_step": self.local_trigger_step,
+                "rejected_prompt_groups": dict(self.axion_batch_adapter.rejected),
+                "resume_supported": False,
+                "resume_limitation": "Asynchronous queued and in-flight inputs are not checkpointed; use a fresh run.",
+            }
+            metadata_path = os.path.join(local_global_step_folder, "axion_training_state.json")
+            with open(metadata_path + ".tmp", "w") as stream:
+                json.dump(state, stream, indent=2)
+                stream.write("\n")
+            os.replace(metadata_path + ".tmp", metadata_path)
         # latest checkpointed iteration tracker (for atomic usage)
         local_latest_checkpointed_iteration = os.path.join(
             self.config.trainer.default_local_dir, "latest_checkpointed_iteration.txt"

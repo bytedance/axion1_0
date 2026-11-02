@@ -178,6 +178,15 @@ margin that differs between frameworks.
 `tree` holds the expected value of each hop, which lets a judge tell "retrieved
 the wrong object" from "computed it wrong" and supplies a process reward in RL.
 
+## RL task selection
+
+The [RL guide](../../training/rl/README.md#prepare-tasks) documents
+`pipeline/prepare_rl.py`: explicit intermediate targets, reviewed exclusions,
+and selection from four complete attempts at one checkpoint. It writes the
+training parquet and its selection manifest. Legacy generator `tree` fields
+must be mapped to reviewed intermediate targets; the selector does not infer
+them from `critical` flags.
+
 ## Writing a generator for another database
 
 ```python

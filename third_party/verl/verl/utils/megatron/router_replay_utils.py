@@ -17,6 +17,8 @@ Router Replay Utilities
 Utilities for handling router replay functionality in Megatron models.
 """
 
+# Modified by the Axion authors: token-aligned BSHD routing replay and coverage.
+
 import inspect
 import warnings
 from typing import Optional
@@ -39,8 +41,10 @@ from verl.models.mcore.util import (
     postprocess_packed_seqs,
     postprocess_thd_engine,
     preprocess_packed_seqs,
+    preprocess_bshd_engine,
     preprocess_thd_engine,
 )
+from verl.utils.rollout_routing import bshd_router_rows
 from verl.utils.device import get_device_name
 from verl.utils.megatron.router_replay_patch import RouterReplay, RouterReplayAction
 
@@ -281,21 +285,26 @@ def merge_router_topk_indices(attention_mask, input_ids, mini_layer_topk_idx_lis
         mini_layer_topk_idx_list.append(layers_topk_idx.cpu())
 
 
-def build_r3_replay_mask(input_ids: torch.Tensor, response_mask: torch.Tensor) -> torch.Tensor:
-    """Build a full-sequence replay mask for rollout-captured routes.
+def build_r3_replay_mask(input_ids: torch.Tensor, response_mask: torch.Tensor,
+                         response_attention_mask=None) -> torch.Tensor:
+    """Replay causal predecessors of the final policy token, skipping tool-only tails.
 
-    Response logprobs are read from shifted model rows, but those rows attend to
-    earlier hidden states whose MoE routing also affects the result. Replay every
-    causal row that can influence response logprobs and skip only the final
-    response row, whose logits are not used by ``no_padding_2_padding``.
+    Modified by Axion: a session can end immediately after appending a tool
+    observation. Those unforwarded trailing rows must use native routes.
     """
     total_lens = input_ids.offsets().diff()
-    response_lens = response_mask.sum(dim=-1).to(device=total_lens.device, dtype=total_lens.dtype)
-    bs = total_lens.size(0)
-    values = torch.tensor([True, False], dtype=torch.bool, device=total_lens.device).repeat(bs)
-    replay_lens = torch.where(response_lens > 0, total_lens - 1, torch.zeros_like(total_lens))
-    suffix_lens = total_lens - replay_lens
-    counts = torch.stack([replay_lens, suffix_lens], dim=1).flatten()
+    active = response_mask.to(device=total_lens.device).bool()
+    if response_attention_mask is None:
+        replay_lens = torch.where(active.any(dim=-1), total_lens - 1, 0)
+    else:
+        response_lens = response_attention_mask.sum(dim=-1).to(total_lens)
+        positions = torch.arange(active.shape[-1], device=total_lens.device)
+        last_policy = torch.where(active, positions, -1).max(dim=-1).values
+        replay_lens = torch.where(last_policy >= 0, total_lens - response_lens + last_policy, 0)
+    if torch.any((replay_lens < 0) | (replay_lens > total_lens)):
+        raise ValueError("Invalid R3 causal replay length")
+    values = torch.tensor([True, False], dtype=torch.bool, device=total_lens.device).repeat(total_lens.numel())
+    counts = torch.stack([replay_lens, total_lens - replay_lens], dim=1).flatten()
     mask_values = torch.repeat_interleave(values, counts)
     return torch.nested.nested_tensor_from_jagged(mask_values, offsets=input_ids.offsets())
 
@@ -306,6 +315,8 @@ def set_router_replay_data(
     tf_config,
     vp_rank=None,
     replay_mask=None,
+    data_format="thd",
+    forced_max_seqlen=None,
 ):
     """
     Scatter the packed router top-k indices back to sequence-parallel ranks and update each local
@@ -336,36 +347,58 @@ def set_router_replay_data(
             else None
         )
 
-        replay_mask_rmpad = None
-        if layers_topk_idx.is_nested:
-            layers_topk_idx_rmpad, _, _ = preprocess_thd_engine(
-                layers_topk_idx,
-                pre_process=True,
-                use_fp8_padding=use_fp8_padding,
-                min_local_rows=min_local_rows,
+        if layers_topk_idx is None:
+            raise ValueError("Router replay requires routed_experts in the training batch")
+        moe_layers = sum(is_moe_layer(tf_config, layer) for layer in range(tf_config.num_layers))
+        if layers_topk_idx.ndim != 4 or layers_topk_idx.shape[-2] not in {tf_config.num_layers, moe_layers}:
+            raise ValueError("Routing record layer count does not match the training model")
+        expected_topk = getattr(tf_config, "moe_router_topk", layers_topk_idx.shape[-1])
+        if layers_topk_idx.shape[-1] != expected_topk:
+            raise ValueError("Routing record top-k does not match the training model")
+        scatter = scatter_to_sequence_parallel_region if tf_config.sequence_parallel else lambda x: x
+        replay_mask_rmpad_split = None
+        if data_format == "bshd":
+            if not layers_topk_idx.is_nested:
+                raise ValueError("BSHD routing replay requires nested token-aligned routes")
+            routes_bshd, _, _ = preprocess_bshd_engine(
+                layers_topk_idx, pre_process=True, use_fp8_padding=use_fp8_padding,
+                forced_max_seqlen=forced_max_seqlen,
             )
+            mask_bshd = None
             if replay_mask is not None:
-                replay_mask_rmpad, _, _ = preprocess_thd_engine(
-                    replay_mask,
-                    pre_process=True,
-                    use_fp8_padding=use_fp8_padding,
+                mask_bshd, _, _ = preprocess_bshd_engine(
+                    replay_mask, pre_process=True, use_fp8_padding=use_fp8_padding,
+                    forced_max_seqlen=forced_max_seqlen,
+                )
+            rows, replay_mask_rmpad_split = bshd_router_rows(
+                routes_bshd.to(device_name),
+                mask_bshd.to(device_name) if mask_bshd is not None else None,
+                scatter,
+            )
+            layers_topk_idx_rmpad_split = rows.unsqueeze(0)
+        elif data_format == "thd":
+            replay_mask_rmpad = None
+            if layers_topk_idx.is_nested:
+                layers_topk_idx_rmpad, _, _ = preprocess_thd_engine(
+                    layers_topk_idx, pre_process=True, use_fp8_padding=use_fp8_padding,
                     min_local_rows=min_local_rows,
                 )
+                if replay_mask is not None:
+                    replay_mask_rmpad, _, _ = preprocess_thd_engine(
+                        replay_mask, pre_process=True, use_fp8_padding=use_fp8_padding,
+                        min_local_rows=min_local_rows,
+                    )
+            else:
+                layers_topk_idx_rmpad, _ = preprocess_packed_seqs(
+                    layers_topk_idx, attention_mask, pre_process=True, use_fp8_padding=use_fp8_padding
+                )
+            layers_topk_idx_rmpad_split = scatter(
+                layers_topk_idx_rmpad.to(device_name).squeeze(0).contiguous()
+            ).unsqueeze(0)
+            if replay_mask_rmpad is not None:
+                replay_mask_rmpad_split = scatter(replay_mask_rmpad.to(device_name).squeeze(0).contiguous())
         else:
-            layers_topk_idx_rmpad, _ = preprocess_packed_seqs(
-                layers_topk_idx, attention_mask, pre_process=True, use_fp8_padding=use_fp8_padding
-            )
-        layers_topk_idx_rmpad = layers_topk_idx_rmpad.contiguous()  # 1, dynamic_bs_all, layer_num, topk
-
-        # 1, dynamic_bs_split, layer_num, topk
-        layers_topk_idx_rmpad_split = scatter_to_sequence_parallel_region(
-            layers_topk_idx_rmpad.to(device_name).squeeze(dim=0)
-        ).unsqueeze(dim=0)
-        replay_mask_rmpad_split = None
-        if replay_mask_rmpad is not None:
-            replay_mask_rmpad_split = scatter_to_sequence_parallel_region(
-                replay_mask_rmpad.to(device_name).squeeze(dim=0)
-            )
+            raise ValueError(f"Unsupported routing replay data format: {data_format}")
 
         # dynamic_bs_split, layer_num, topk -> layer_num, dynamic_bs_split, topk
         layers_topk_idx_reshape = layers_topk_idx_rmpad_split.permute(0, 2, 1, 3).squeeze(

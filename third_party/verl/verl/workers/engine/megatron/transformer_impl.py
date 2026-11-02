@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# Modified by the Axion authors: token-aligned BSHD routing replay and coverage.
+
 import inspect
 import logging
 import os
@@ -897,6 +899,7 @@ class MegatronEngineWithLMHead(MegatronEngine):
             "loss_mask": loss_mask,
             "multi_modal_inputs": multi_modal_inputs,
             "routed_experts": routed_experts,
+            "routed_experts_mask": batch.get("routed_experts_mask", None),
         }
 
     def prepare_model_outputs(self, output: dict, data: TensorDict):
@@ -1006,13 +1009,27 @@ class MegatronEngineWithLMHead(MegatronEngine):
             layers_topk_idx = model_inputs["routed_experts"]
             replay_mask = None
             if self.engine_config.router_replay.mode == "R3":
-                replay_mask = build_r3_replay_mask(input_ids, batch["response_mask"])
+                response_attention = (
+                    attention_mask[:, -batch["response_mask"].shape[-1]:]
+                    if attention_mask is not None else None
+                )
+                replay_mask = build_r3_replay_mask(
+                    input_ids, batch["response_mask"], response_attention_mask=response_attention
+                )
+                coverage = model_inputs["routed_experts_mask"]
+                if coverage is not None:
+                    if not coverage.is_nested or not torch.equal(coverage.offsets(), input_ids.offsets()):
+                        raise ValueError("R3 coverage must align with input token rows")
+                    if torch.any(replay_mask.values() & ~coverage.values().bool()):
+                        raise ValueError("R3 batch is missing required causal route coverage")
             set_router_replay_data(
                 layers_topk_idx,
                 None,
                 self.tf_config,
                 vp_rank,
                 replay_mask=replay_mask,
+                data_format="thd" if self.engine_config.use_remove_padding else "bshd",
+                forced_max_seqlen=tu.get_non_tensor_data(data=batch, key="forced_max_seqlen", default=None),
             )
 
         if pad_mode == DatasetPadMode.NO_PADDING:

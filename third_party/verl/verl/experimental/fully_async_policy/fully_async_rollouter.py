@@ -1,3 +1,4 @@
+# Modified by the Axion authors: complete-group collection, explicit update budget and optional validation.
 # Copyright 2025 Meituan Ltd. and/or its affiliates
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -347,27 +348,21 @@ class FullyAsyncRollouter(SeparateRayPPOTrainer):
         print("[FullyAsyncRollouter] Creating datasets...")
         from verl.utils.dataset.rl_dataset import collate_fn
 
-        train_dataset = create_rl_dataset(
-            config.data.train_files,
-            config.data,
-            tokenizer,
-            processor,
-            max_samples=config.data.get("train_max_samples", -1),
-        )
-        val_dataset = create_rl_dataset(
-            config.data.val_files,
-            config.data,
-            tokenizer,
-            processor,
-            max_samples=config.data.get("val_max_samples", -1),
-        )
+        train_dataset, val_dataset = self._create_rollout_datasets()
         train_sampler = create_rl_sampler(config.data, train_dataset)
 
         self._validate_config()
         self._create_dataloader(train_dataset, val_dataset, collate_fn, train_sampler)
 
         self.total_rollout_steps = len(self.train_dataloader) * self.config.trainer.total_epochs
-        if self.config.rollout.total_rollout_steps is not None:
+        if self.config.async_training.get("axion_recipe", False):
+            cap = self.config.rollout.total_rollout_steps
+            if not isinstance(cap, int) or isinstance(cap, bool) or cap <= 0:
+                raise ValueError("Axion requires an explicit positive rollout prompt-attempt budget")
+            if len(self.train_dataloader) == 0:
+                raise ValueError("Axion training data is empty")
+            self.total_rollout_steps = cap
+        elif self.config.rollout.total_rollout_steps is not None:
             self.total_rollout_steps = min(self.config.rollout.total_rollout_steps, self.total_rollout_steps)
         print(f"[FullyAsyncRollouter] Total rollout steps: {self.total_rollout_steps}")
         self.total_train_steps = None
@@ -383,6 +378,8 @@ class FullyAsyncRollouter(SeparateRayPPOTrainer):
 
         # Config
         self.staleness_threshold: float = config.async_training.get("staleness_threshold", 1)
+        self.axion_recipe = config.async_training.get("axion_recipe", False)
+        self._stop_requested = False
         # required_samples use ppo_mini_batch_size*require_batches as the minimum number of samples.
         self.require_batches = config.async_training.require_batches
         self.required_samples = config.actor_rollout_ref.actor.ppo_mini_batch_size * self.require_batches
@@ -413,6 +410,24 @@ class FullyAsyncRollouter(SeparateRayPPOTrainer):
         self.pending_queue = asyncio.Queue(maxsize=128)
         self.active_tasks = set()
 
+    def _create_rollout_datasets(self):
+        load_validation = True
+        if self.config.async_training.get("axion_recipe", False):
+            from axion.training.rl.async_batch import validation_dataset_required
+
+            load_validation = validation_dataset_required(self.config)
+        train_dataset = create_rl_dataset(
+            self.config.data.train_files, self.config.data, self.tokenizer, self.processor,
+            max_samples=self.config.data.get("train_max_samples", -1),
+        )
+        val_dataset = None
+        if load_validation:
+            val_dataset = create_rl_dataset(
+                self.config.data.val_files, self.config.data, self.tokenizer, self.processor,
+                max_samples=self.config.data.get("val_max_samples", -1),
+            )
+        return train_dataset, val_dataset
+
     def _init_async_objects(self):
         # Initialize asyncio synchronization primitives.
         # `lock` protects shared state: paused / active_tasks / staleness_samples / timing fields.
@@ -437,6 +452,8 @@ class FullyAsyncRollouter(SeparateRayPPOTrainer):
                 self.total_rollout_steps
                 / (self.required_samples * self.config.async_training.trigger_parameter_sync_step)
             )
+            if self.axion_recipe:
+                self.total_train_steps = self.config.trainer.total_training_steps
 
             self.max_concurrent_samples = len(self.llm_server_manager.get_replicas()) * 16
             self.max_concurrent_samples = min(self.max_concurrent_samples, self.max_required_samples)
@@ -504,6 +521,8 @@ class FullyAsyncRollouter(SeparateRayPPOTrainer):
 
     def do_validate(self):
         """Run validation and return metrics"""
+        if self.val_dataloader is None:
+            raise ValueError("Cannot run validation without a configured validation dataset")
         timing_raw = {}
         with marked_timer("rollouter/validate_time", timing_raw, color="green"):
             val_metrics: dict = self._validate()
@@ -668,7 +687,12 @@ class FullyAsyncRollouter(SeparateRayPPOTrainer):
         """
         Create a continuous data iterator across epoch
         """
-        for epoch in range(self.config.trainer.total_epochs):
+        epochs = self.config.trainer.total_epochs
+        if self.axion_recipe:
+            # The feeder enforces the exact prompt-attempt cap. Dataset passes
+            # are only traversal; they do not silently limit accepted updates.
+            epochs = (self.total_rollout_steps + len(self.train_dataloader) - 1) // len(self.train_dataloader)
+        for epoch in range(epochs):
             iterator = iter(self.train_dataloader)
             for batch_dict in iterator:
                 yield epoch, batch_dict
@@ -937,9 +961,15 @@ class FullyAsyncRollouter(SeparateRayPPOTrainer):
 
         try:
             # Run build and monitoring tasks concurrently
-            await asyncio.gather(generation_task, monitor_task, return_exceptions=True)
+            results = await asyncio.gather(generation_task, monitor_task, return_exceptions=True)
+            if self.axion_recipe and not self._stop_requested:
+                for result in results:
+                    if isinstance(result, BaseException):
+                        raise result
         except Exception as e:
             print(f"[FullyAsyncRollouter] Asynchronous task execution error: {e}")
+            if self.axion_recipe:
+                raise
         finally:
             if not generation_task.done():
                 generation_task.cancel()
@@ -950,6 +980,19 @@ class FullyAsyncRollouter(SeparateRayPPOTrainer):
             await asyncio.gather(generation_task, monitor_task, return_exceptions=True)
 
         print("[FullyAsyncRollouter] Rollouter fit completed")
+
+    async def stop_generation(self):
+        """Stop producing unused samples after the requested optimizer updates."""
+        self._stop_requested = True
+        self.running = False
+        self._resume_event.set()
+        tasks = [getattr(self, "feed_task", None), getattr(self, "processor_task", None)]
+        tasks.extend(list(self.active_tasks))
+        pending = [task for task in tasks if task is not None and not task.done()]
+        for task in pending:
+            task.cancel()
+        if pending:
+            await asyncio.gather(*pending, return_exceptions=True)
 
     async def _async_monitor_loop(self):
         """
@@ -992,6 +1035,12 @@ class FullyAsyncRollouter(SeparateRayPPOTrainer):
                     f"due to full queue: size={queue_size}, max={self.max_queue_size}"
                 )
             return True
+
+        if self.axion_recipe:
+            # Rejected/degenerate groups must release production capacity even
+            # before the next optimizer update. Exact version rejection happens
+            # on the trainer; cumulative submitted counts are not backpressure.
+            return len(self.active_tasks) + queue_size >= self.max_required_samples
 
         if self.staleness_samples >= self.max_required_samples:
             if not self.paused:

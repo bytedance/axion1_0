@@ -40,7 +40,7 @@ def _config_packages():
 
 
 @pytest.mark.parametrize("directory,name", [
-    (RL / "config", "deepresearch_trainer"),
+    (RL / "config", "paper"),
     (VERL / "experimental/fully_async_policy/config", "fully_async_ppo_megatron_trainer"),
 ])
 def test_trainer_configs_compose_outside_source_directory(directory, name, tmp_path, monkeypatch):
@@ -48,13 +48,10 @@ def test_trainer_configs_compose_outside_source_directory(directory, name, tmp_p
     monkeypatch.chdir(tmp_path)
     with mock.patch.dict(sys.modules, _config_packages()):
         with initialize_config_dir(version_base=None, config_dir=str(directory)):
-            config = compose(config_name=name)
+            config = compose(config_name=name, overrides=["hydra.searchpath=[pkg://verl.trainer.config]"])
     assert "actor" in config.actor_rollout_ref
     assert "optim" in config.actor_rollout_ref.actor
     assert "adv_estimator" in config.algorithm
-    if name == "deepresearch_trainer":
-        assert (ROOT / config.custom_reward_function.path).is_file()
-        assert (ROOT / config.actor_rollout_ref.rollout.agent.agent_loop_config_path).is_file()
 
 
 def _assert_class_exists(target):
@@ -78,7 +75,7 @@ def test_configured_agent_tools_managers_and_node_files_are_shipped(monkeypatch)
             for key in ("search_nodes_conf", "scholar_nodes_conf", "python_nodes_conf"):
                 if key in item.config:
                     assert (ROOT / item.config[key]).is_file(), item.config[key]
-    config = OmegaConf.load(RL / "config/deepresearch_trainer.yaml")
+    config = OmegaConf.load(RL / "config/paper.yaml")
     for path, class_name in (
         (config.reward_manager.module.path, config.reward_manager.name),
         (config.reward_model.reward_loop_module_path, config.reward_model.reward_loop_class_name),
@@ -146,22 +143,11 @@ def test_helper_shell_dispatch_from_unrelated_cwd(script, module, tmp_path):
 
 
 def test_launcher_paths_and_pythonpath_resolve_from_unrelated_cwd(tmp_path):
-    # Evaluate only path assignments: the full launcher starts a training job.
-    launcher = RL / "run_deepresearch_fully_async_megatron.sh"
-    prefixes = ("WORKING_DIR=", "QUEST_ROOT=", "export PYTHONPATH=")
-    assignments = [line for line in launcher.read_text().splitlines() if line.startswith(prefixes)]
-    assert len(assignments) == 3
-    code = '\n'.join([
-        'SCRIPT_DIR="$1"', *assignments, 'cd "$WORKING_DIR"',
-        'printf "%s\\n" "$PWD" "$QUEST_ROOT" "$PYTHONPATH"',
-    ])
-    env = {key: value for key, value in os.environ.items() if key not in {"WORKING_DIR", "PYTHONPATH"}}
-    result = subprocess.run(["bash", "-c", code, "layout-check", str(RL)], cwd=tmp_path,
-                            env=env, text=True, capture_output=True, check=True)
-    cwd, secrets_root, pythonpath = result.stdout.splitlines()
-    assert Path(cwd) == ROOT
-    assert Path(secrets_root) == ROOT
-    assert pythonpath.split(os.pathsep)[:2] == [str(ROOT), str(RL)]
+    env = {key: value for key, value in os.environ.items() if key != "PYTHONPATH"}
+    result = subprocess.run(["bash", str(RL / "train.sh"), "--help"], cwd=tmp_path,
+                            env=env, text=True, capture_output=True)
+    assert result.returncode == 0, result.stderr
+    assert "--deployment" in result.stdout and "--updates" in result.stdout
 
 
 @pytest.mark.parametrize("relative,root_name", [

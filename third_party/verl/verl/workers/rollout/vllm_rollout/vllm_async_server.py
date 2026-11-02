@@ -1,3 +1,4 @@
+# Modified by the Axion authors: record parameter-version bounds around each generation request.
 # Copyright 2024 Bytedance Ltd. and/or its affiliates
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -647,6 +648,9 @@ class vLLMHttpServer:
                     lora_name=VLLM_LORA_NAME, lora_int_id=VLLM_LORA_INT_ID, lora_path=VLLM_LORA_PATH
                 )
 
+        # Modified by Axion: completion delivery can race a weight-version update.
+        # Include both endpoints so staleness never understates the oldest tokens.
+        generation_start_version = self.global_steps
         with RLInsightLogger.trace_state("vllm_generate", state_lane_id=f"replica_{self.replica_rank}"):
             generator = self.engine.generate(
                 prompt=prompt,
@@ -662,7 +666,13 @@ class vLLMHttpServer:
                 final_res = output
             assert final_res is not None
 
-        extra_fields = {"global_steps": self.global_steps}
+        generation_end_version = self.global_steps
+        versions = [value for value in (generation_start_version, generation_end_version) if value is not None]
+        extra_fields = {
+            "global_steps": generation_end_version,
+            "min_global_steps": min(versions) if versions else None,
+            "max_global_steps": max(versions) if versions else None,
+        }
         # Handle abort case: when the request is aborted by pause_generation(abort),
         # outputs may be empty. Return empty results with stop_reason="aborted"
         # instead of crashing with "IndexError: list index out of range".

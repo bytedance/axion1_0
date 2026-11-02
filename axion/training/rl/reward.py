@@ -1,4 +1,4 @@
-# Axion relocation: canonical package/resource paths; training behavior unchanged.
+# Axion: paper Eq4/Eq5 reward, submitted answers, explicit targets and judge-failure exclusion.
 # Copyright 2025 DeepResearch authors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -99,6 +99,87 @@ except Exception:
 
 _INLINE_CITATION_MAX_SCORE_DEFAULT = DRB_INLINE_CITATION_MAX_SCORE_DEFAULT
 _BASE_SCORE_WEIGHT_DEFAULT = 0.75
+
+
+async def _paper_judge_request(addresses, model, prompt, *, timeout_seconds=120, max_retries=3):
+    """Call only the explicitly configured paper judge; no provider/model fallback."""
+    urls = [x.strip() for x in addresses.split(",")] if isinstance(addresses, str) else list(addresses or [])
+    urls = [url.rstrip("/") for url in urls if url]
+    if not urls or not model or model == "default":
+        return None
+    api_key = os.environ.get("S2_JUDGE_API_KEY") or os.environ.get("REWARD_API_KEY") or os.environ.get("VLLM_API_KEY")
+    headers = {"Content-Type": "application/json"}
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
+    payload = {"model": model, "messages": [{"role": "user", "content": prompt}],
+               "temperature": 0.0, "max_tokens": 2048,
+               "chat_template_kwargs": {"enable_thinking": False}}
+    # Use the existing endpoint balancer without inheriting legacy model overrides.
+    balancer = get_load_balancer(urls, strategy="least_connections", max_retries=max_retries)
+    async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=timeout_seconds)) as session:
+        for _ in range(max_retries):
+            server = balancer.get_next_server()
+            if not server.startswith(("http://", "https://")):
+                server = "http://" + server
+            endpoint = server.rstrip("/")
+            endpoint += "/chat/completions" if endpoint.endswith("/v1") else "/v1/chat/completions"
+            balancer.acquire(server)
+            success = False
+            try:
+                async with session.post(endpoint, json=payload, headers=headers) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        text = data["choices"][0]["message"]["content"]
+                        if isinstance(text, str) and text.strip():
+                            success = True
+                            return text
+            except (aiohttp.ClientError, asyncio.TimeoutError, KeyError, ValueError, TypeError):
+                pass
+            finally:
+                balancer.release(server, success=success)
+    return None
+
+
+def make_paper_judge(*, eval_llm_address=None, eval_llm_ips=None, eval_llm_ports=None,
+                     eval_llm_model="", eval_llm_nodes_conf=None):
+    """Build the shared offline/online semantic judge with explicit deployment inputs."""
+    addresses = eval_llm_address
+    if not addresses and eval_llm_ips:
+        addresses = generate_server_addresses(eval_llm_ips, eval_llm_ports)
+    if not addresses:
+        addresses = os.environ.get("S2_JUDGE_BASE_URL")
+    if not eval_llm_model:
+        eval_llm_model = os.environ.get("S2_JUDGE_MODEL", "")
+
+    async def judge(prompt):
+        resolved_addresses, resolved_model = _resolve_eval_llm_profile_runtime_config(
+            profile="obj", eval_llm_nodes_conf=eval_llm_nodes_conf,
+            default_addresses=addresses, default_model=eval_llm_model)
+        # A hot-reloaded endpoint file may change addresses, but cannot silently
+        # switch the model selected in the paper recipe.
+        if resolved_model != eval_llm_model:
+            return None
+        return await _paper_judge_request(resolved_addresses, eval_llm_model, prompt)
+    return judge
+
+
+async def compute_paper_score(data_source, solution_str, ground_truth, extra_info=None,
+                              eval_llm_address=None, eval_llm_ips=None, eval_llm_ports=None,
+                              eval_llm_model="", eval_llm_nodes_conf=None, **kwargs):
+    """Formal Section 3.3 reward. It bypasses legacy citation/format shaping."""
+    from axion.training.rl.process_reward import score
+
+    del solution_str, kwargs  # Full original roles, not a re-decoded final session.
+    if data_source != "axion_paper_rl":
+        return {"score": 0.0, "acc": 0.0, "drop_from_training": True,
+                "error_type": "invalid_paper_data_source"}
+    extra = extra_info if isinstance(extra_info, dict) else {}
+    return await score(
+        messages=extra.get("full_messages"), reference=ground_truth, hops=extra.get("hops"),
+        question=extra.get("question", ""),
+        judge=make_paper_judge(eval_llm_address=eval_llm_address, eval_llm_ips=eval_llm_ips,
+                               eval_llm_ports=eval_llm_ports, eval_llm_model=eval_llm_model,
+                               eval_llm_nodes_conf=eval_llm_nodes_conf))
 
 
 def _normalize_eval_profile_name(raw_name: str) -> str:

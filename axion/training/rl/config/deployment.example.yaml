@@ -1,0 +1,28 @@
+# These limits and service addresses are deployment inputs; the paper does not
+# report their exact values. Fill every null before running the launcher.
+context_threshold: null
+max_assistant_turns: null
+max_turn_response_length: null
+max_tool_response_length: null
+judge:
+  base_url: null
+  model: Qwen3.8-27B
+  api_key_env: AXION_JUDGE_API_KEY
+summarizer:
+  base_url: null
+  model: Qwen3.5-9B
+  api_key_env: AXION_SUMMARY_API_KEY
+condenser:
+  base_url: null
+  model: Qwen3.5-9B
+  api_key_env: AXION_MEMORY_API_KEY
+search_url: null
+scholar_url: null
+python_url: null
+# The paper uses 40 rollout GPUs and 16 trainer GPUs. Services run separately.
+rollout_nodes: 5
+trainer_nodes: 2
+gpus_per_node: 8
+rollout_tensor_parallel_size: 4
+trainer_tensor_parallel_size: 2
+trainer_expert_parallel_size: 8

@@ -1,13 +1,16 @@
 # verl RL backend
 
 This directory vendors `data/open_verl`, branch `quest-deepresearch-port`,
-revision `b1f05f92ad76e70e5684747d97d0dc6b7920834f`. The framework retains its
-`verl` namespace and Apache-2.0 license and notices.
+revision `b1f05f92ad76e70e5684747d97d0dc6b7920834f`. It retains the `verl`
+namespace, Apache-2.0 license and upstream notices.
 
-The Axion recipe lives in [`axion/training/rl`](../../axion/training/rl/README.md).
-The fully asynchronous Megatron configuration resolves base trainer settings
-through `pkg://verl.trainer.config`, allowing the backend and Axion recipe to be
-installed separately. Backend computation code is unchanged by this relocation.
+The [Axion RL recipe](../../axion/training/rl/README.md) adds narrowly scoped
+hooks for complete prompt-group filtering, session expansion, optimizer-update
+accounting and optional validation. These are enabled by
+`async_training.axion_recipe`. Routing adapters preserve captured routes across
+generation resumes and support BSHD replay and padding in the Megatron actor.
+Modified files carry change notices.
 
-See the [RL guide](../../axion/training/rl/README.md) for environment requirements
-and the limits of the available reproduction records.
+Install this backend into a separately prepared RL environment with `--no-deps`.
+The upstream `vllm` extra is too old for the Axion R3 recipe; follow the RL guide
+for required capabilities and the limits of available runtime records.

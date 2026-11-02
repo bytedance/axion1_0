@@ -14,8 +14,9 @@
 #
 # Modified by the Axion authors from the DeepResearch recipe: comments and
 # log messages translated to English, hard-coded site paths replaced with
-# environment variables or relative paths, and bug fixes. Unmodified files in
-# this directory carry their original headers.
+# environment variables or relative paths; exact token/routing replay, modern
+# backend interfaces, and bounded session starts. Unmodified files in this
+# directory carry their original headers.
 #
 """
 DeepResearch Agent Loop for verl framework.
@@ -29,7 +30,7 @@ import logging
 import os
 import re
 import time
-from datetime import date, datetime
+from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, List, Optional
 from uuid import uuid4
@@ -40,13 +41,16 @@ from verl.experimental.agent_loop.agent_loop import (
     register,
 )
 from verl.tools.schemas import ToolResponse
-from verl.tools.utils.tool_registry import initialize_tools_from_config
-from verl.utils.chat_template import (
+from verl.tools.tool_registry import initialize_tools_from_config
+from verl.utils.tokenizer.chat_template import (
     apply_chat_template as safe_apply_chat_template,
     initialize_system_prompt,
 )
 from verl.utils.profiler import simple_timer
+from verl.utils.rollout_routing import merge_routed_experts, session_routing, update_version_bounds
 from verl.utils.rollout_trace import rollout_trace_op
+
+from ..prompts import build_system_prompt, tokenize_session_prompt
 
 from ..memory import (
     build_fallback_memory_state,
@@ -131,59 +135,9 @@ class AgentState(Enum):
     TERMINATED = "terminated"
 
 
-SEARCH_TOOL_PROMPT = """{"type": "function", "function": {"name": "search", "description": "Perform Google web searches then returns a string of the top search results. Accepts multiple queries.", "parameters": {"type": "object", "properties": {"query": {"type": "array", "items": {"type": "string", "description": "The search query."}, "minItems": 1, "description": "The list of search queries."}}, "required": ["query"]}}}"""
-
-SCHOLAR_TOOL_PROMPT = """{"type": "function", "function": {"name": "google_scholar", "description": "Leverage Google Scholar to retrieve relevant information from academic publications. Accepts multiple queries. This tool will also return results from google search", "parameters": {"type": "object", "properties": {"query": {"type": "array", "items": {"type": "string", "description": "The search query."}, "minItems": 1, "description": "The list of search queries for Google Scholar."}}, "required": ["query"]}}}"""
-
-PYTHON_TOOL_PROMPT = """{"type": "function", "function": {"name": "PythonInterpreter", "description": "Executes Python code in a sandboxed environment. To use this tool, you must follow this format:\n1. The 'arguments' JSON object must be empty: {}.\n2. The Python code to be executed must be placed immediately after the JSON block, enclosed within <code> and </code> tags.\n\nIMPORTANT: Any output you want to see MUST be printed to standard output using the print() function.\n\nExample of a correct call:\n<tool_call>\n{\"name\": \"PythonInterpreter\", \"arguments\": {}}\n<code>\nimport numpy as np\n# Your code here\nprint(f\"The result is: {np.mean([1,2,3])}\")\n</code>\n</tool_call>", "parameters": {"type": "object", "properties": {}}}}"""
-
-VISIT_TOOL_PROMPT = """{"type": "function", "function": {"name": "visit", "description": "Visit webpage(s) and return the summary of the content.", "parameters": {"type": "object", "properties": {"url": {"type": "array", "items": {"type": "string"}, "description": "The URL(s) of the webpage(s) to visit. Can be a single URL or an array of URLs."}, "goal": {"type": "string", "description": "The specific information goal for visiting webpage(s)."}}, "required": ["url", "goal"]}}}"""
-
-
-# System prompt for DeepResearch agent
-SYSTEM_PROMPT = """You are a deep research assistant. Your core function is to conduct thorough, multi-source investigations into any topic. You must handle both broad, open-domain inquiries and queries within specialized academic fields. For every request, synthesize information from credible, diverse sources to deliver a comprehensive, accurate, and objective response. When you have gathered sufficient information and are ready to provide the definitive response, you must enclose the entire final answer within <answer></answer> tags.
-
-# Tools
-
-You may call one or more functions to assist with the user query.
-
-You are provided with function signatures within <tools></tools> XML tags:
-<tools>
-""" + SEARCH_TOOL_PROMPT + """
-""" + SCHOLAR_TOOL_PROMPT + """
-""" + PYTHON_TOOL_PROMPT + """
-""" + VISIT_TOOL_PROMPT + """
-</tools>
-
-# Using prev_state (Research State Summary)
-
-If you see a "RESEARCH STATE SUMMARY (prev_state)" section in the user message, it contains a compressed summary of previous research progress. Use it to:
-
-1. **Avoid redundant work**:
-   - Check `search_queries` to avoid repeating searches that have already been executed.
-   - Check `visited_sources` to avoid visiting URLs that have already been visited.
-
-2. **Use verified information**:
-   - Check `information_state.trusted` for facts that have been verified from visited sources. You can use these directly in your answer without re-searching or re-visiting.
-   - Check `information_state.untrusted` for claims that have been contradicted or proven unreliable.
-
-3. **Follow up on uncertain information**:
-   - Check `information_state.uncertain` for claims that need more evidence. The `need` field specifies the exact next action (e.g., "visit <URL>" or "search <query>") to resolve the uncertainty.
-
-IMPORTANT: Do NOT search for or visit information that is already in `prev_state`, unless it's insufficient to answer the user's question. Only in this case, you are encouraged to search for more information or even visit the same URL. Instead, use the information from `prev_state` directly, or follow the specific actions suggested in `information_state.uncertain.need` if more information is needed.
-
-The final answer must exclude any information that remains uncertain or pending. All statements included must be fully verified.
-
-For each function call, return a json object with function name and arguments within <tool_call></tool_call> XML tags:
-<tool_call>
-{"name": <function-name>, "arguments": <args-json-object>}
-</tool_call>
-
-Current date: """
-
 
 def _truncate_routed_experts(experts, prompt_ids, response_ids, response_length):
-    # routed experts of the session's last request: [len(prompt)+len(response)-1, layers, topk]; clip to the row
+    # Clip the preserved per-token routes to the retained session row.
     if experts is None:
         return None
     n = len(prompt_ids) + min(len(response_ids), response_length)
@@ -209,7 +163,7 @@ class SessionData:
         self.response_ids: List[int] = []
         self.response_mask: List[int] = []
         self.response_logprobs: List[float] = []
-        self.routed_experts = None  # np.ndarray [T-1, layers, topk] from the last request of this session
+        self.routed_experts = None  # uint8 [covered causal rows, layers, topk]
         self.response_text: str = ""
         self.messages: List[Dict[str, Any]] = []
 
@@ -236,7 +190,7 @@ class AgentData:
         self.response_ids: List[int] = []
         self.response_mask: List[int] = []
         self.response_logprobs: List[float] = []
-        self.routed_experts = None  # last generation request's routed experts (covers the session so far)
+        self.routed_experts = None  # original captured routes, preserved across turns/versions
         self.turn_scores: List[float] = []
         self.tool_rewards: List[float] = []
         self.user_turns = 0
@@ -247,6 +201,7 @@ class AgentData:
 
         # Memory state
         self.pending_messages: Optional[List[Dict[str, Any]]] = None
+        self.pending_prompt_ids: Optional[List[int]] = None
         self.memory_state: Optional[Dict] = None
         self.session_id: int = 0
         self.condenser_call_id: int = 0
@@ -284,8 +239,8 @@ class DeepResearchAgentLoop(AgentLoopBase):
 
     _class_initialized = False
 
-    def __init__(self, trainer_config, server_manager, tokenizer, processor, dataset_cls, dataset_config, **kwargs):
-        super().__init__(trainer_config, server_manager, tokenizer, processor, dataset_cls, dataset_config, **kwargs)
+    def __init__(self, trainer_config, server_manager, tokenizer, processor, dataset_cls, data_config, **kwargs):
+        super().__init__(trainer_config, server_manager, tokenizer, processor, dataset_cls, data_config, **kwargs)
         self.init_class(self.config, tokenizer, processor)
 
     @classmethod
@@ -300,9 +255,13 @@ class DeepResearchAgentLoop(AgentLoopBase):
         cls.processor = processor
 
         # Multi-turn configuration
-        cls.max_turns = config.actor_rollout_ref.rollout.multi_turn.get("max_turns", 100)
         cls.max_user_turns = config.actor_rollout_ref.rollout.multi_turn.get("max_user_turns", 50)
         cls.max_assistant_turns = config.actor_rollout_ref.rollout.multi_turn.get("max_assistant_turns", 50)
+        if getattr(getattr(config, "async_training", None), "axion_recipe", False):
+            # MultiTurnConfig exposes role limits, not a custom total-turn field.
+            cls.max_turns = cls.max_assistant_turns + cls.max_user_turns
+        else:
+            cls.max_turns = config.actor_rollout_ref.rollout.multi_turn.get("max_turns", 100)
         cls.max_parallel_calls = config.actor_rollout_ref.rollout.multi_turn.get("max_parallel_calls", 1)
         cls.max_tool_response_length = config.actor_rollout_ref.rollout.multi_turn.get("max_tool_response_length", 10000)
         cls.tool_response_truncate_side = config.actor_rollout_ref.rollout.multi_turn.get("tool_response_truncate_side", "middle")
@@ -781,15 +740,7 @@ class DeepResearchAgentLoop(AgentLoopBase):
 
     def _get_system_prompt(self) -> str:
         """Get system prompt with current date."""
-        prompt = SYSTEM_PROMPT + date.today().strftime("%Y-%m-%d")
-        if self.soften_answer_prompt:
-            prompt += (
-                "\n\nIMPORTANT: Do not refuse to answer or leave the answer blank because you are "
-                "uncertain. When you have researched enough, commit to your single best-supported "
-                "answer based on the evidence gathered, and always place it inside <answer></answer> "
-                "tags. Never end your response without a final <answer>."
-            )
-        return prompt
+        return build_system_prompt(soften_answer_prompt=self.soften_answer_prompt)
 
     def _messages_to_text(self, messages: List[Dict], add_generation_prompt: bool = True) -> str:
         """Build chat-formatted text from messages."""
@@ -940,6 +891,14 @@ class DeepResearchAgentLoop(AgentLoopBase):
             original_user_content=original_user_content,
         )
 
+        initial_messages = kwargs.get("axion_initial_messages")
+        initial_ids = kwargs.get("axion_initial_prompt_ids")
+        if (initial_messages is None) != (initial_ids is None):
+            raise ValueError("Initial session messages and token IDs must be provided together")
+        if initial_messages is not None:
+            agent_data.pending_messages = copy.deepcopy(list(initial_messages))
+            agent_data.pending_prompt_ids = list(initial_ids)
+
         # State machine loop
         state = AgentState.PENDING
         consecutive_invalid_count = 0
@@ -1000,13 +959,19 @@ class DeepResearchAgentLoop(AgentLoopBase):
         # Build session data list for expansion in manager
         session_outputs = []
         for session in all_sessions:
+            routes, route_mask = session_routing(
+                session.routed_experts, len(session.prompt_ids), session.response_ids,
+                session.response_mask, self.response_length,
+                required=self.config.actor_rollout_ref.rollout.enable_rollout_routing_replay,
+            )
             session_outputs.append({
                 "session_id": session.session_id,
                 "prompt_ids": session.prompt_ids,
                 "response_ids": session.response_ids[:self.response_length],
                 "response_mask": session.response_mask[:self.response_length],
                 "response_logprobs": session.response_logprobs[:self.response_length] if session.response_logprobs else None,
-                "routed_experts": _truncate_routed_experts(session.routed_experts, session.prompt_ids, session.response_ids, self.response_length),
+                "routed_experts": routes,
+                "routed_experts_mask": route_mask,
                 "memory_state": session.memory_state,
                 "messages": session.messages,
             })
@@ -1026,8 +991,11 @@ class DeepResearchAgentLoop(AgentLoopBase):
         )
         output.extra_fields.update({
             "session_id": final_session.session_id,
+            "session_prompt_overflow": int(agent_data.metrics.get("session_prompt_overflow", 0)),
             "num_sessions": num_sessions,
             "session_outputs": session_outputs,  # All sessions for expansion
+            "min_global_steps": agent_data.extra_fields.get("min_global_steps"),
+            "max_global_steps": agent_data.extra_fields.get("max_global_steps"),
             "full_response": agent_data.full_response,  # For reward computation
             "memory_state": final_session.memory_state,
             "turn_scores": agent_data.turn_scores,
@@ -1045,48 +1013,61 @@ class DeepResearchAgentLoop(AgentLoopBase):
 
         return output
 
+    def _session_messages(self, agent_data: AgentData, memory_state=None):
+        user_content = agent_data.original_user_content
+        if memory_state:
+            user_content += format_prev_state_section(memory_state)
+        return [
+            {"role": "system", "content": self._get_system_prompt()},
+            {"role": "user", "content": user_content},
+        ]
+
+    async def _tokenize_session_messages(self, messages):
+        return await self.loop.run_in_executor(
+            None, lambda: tokenize_session_prompt(self.tokenizer, messages, self.apply_chat_template_kwargs)
+        )
+
     async def _handle_pending_state(
         self, agent_data: AgentData, sampling_params: Dict[str, Any]
     ) -> AgentState:
-        """Handle the pending state: prepare the prompt and start generation."""
-        # Build messages with system prompt
-        system_prompt = self._get_system_prompt()
-
-        # Add prev_state to user content if memory state exists
-        user_content = agent_data.original_user_content
-        if agent_data.memory_state:
-            state_section = format_prev_state_section(agent_data.memory_state)
-            user_content = agent_data.original_user_content + state_section
-
-        if agent_data.pending_messages:
-            session_messages = agent_data.pending_messages
-            agent_data.pending_messages = None
-        else:
-            session_messages = [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_content},
-            ]
-
-        # Update agent_data messages
+        """Validate the complete prefix before changing state or sampling any token."""
+        session_messages = agent_data.pending_messages
+        if session_messages is None:
+            session_messages = self._session_messages(agent_data, agent_data.memory_state)
+        prompt_ids = agent_data.pending_prompt_ids
+        if prompt_ids is None:
+            prompt_ids = await self._tokenize_session_messages(session_messages)
+        if len(prompt_ids) > self.prompt_length:
+            raise ValueError(
+                f"Initial session prompt has {len(prompt_ids)} tokens; limit is {self.prompt_length}. "
+                "Use PaperRLHFDataset to filter the complete system/question prefix before rollout."
+            )
         agent_data.messages = session_messages
-
-        # Track full messages (only for the first session, i.e., before any condenser)
+        agent_data.prompt_ids = list(prompt_ids)
+        agent_data.pending_messages = None
+        agent_data.pending_prompt_ids = None
         if agent_data.session_id == 0:
             agent_data.full_messages = copy.deepcopy(session_messages)
-
-        # Tokenize prompt
-        agent_data.prompt_ids = await self.loop.run_in_executor(
-            None,
-            lambda: safe_apply_chat_template(
-                self.tokenizer,
-                session_messages,
-                add_generation_prompt=True,
-                tokenize=True,
-                **self.apply_chat_template_kwargs,
-            ),
-        )
-
         return AgentState.GENERATING
+
+    def _append_generation_output(self, agent_data: AgentData, output):
+        """Append exact sampled IDs, routes and versions without re-tokenizing history."""
+        required = self.config.actor_rollout_ref.rollout.enable_rollout_routing_replay
+        paper_recipe = bool(getattr(getattr(self.config, "async_training", None), "axion_recipe", False))
+        if paper_recipe and len(output.token_ids) != len(output.log_probs or []):
+            raise ValueError("Rollout token/logprob length mismatch")
+        agent_data.routed_experts = merge_routed_experts(
+            agent_data.routed_experts, output.routed_experts,
+            len(agent_data.prompt_ids), len(output.token_ids),
+            required=required, max_experts=256 if paper_recipe else None,
+        )
+        if output.token_ids:
+            update_version_bounds(agent_data.extra_fields, output.extra_fields, required=paper_recipe)
+        agent_data.response_ids += output.token_ids
+        agent_data.prompt_ids += output.token_ids
+        agent_data.response_mask += [1] * len(output.token_ids)
+        if output.log_probs is not None:
+            agent_data.response_logprobs += output.log_probs
 
     async def _handle_generating_state(
         self,
@@ -1125,13 +1106,7 @@ class DeepResearchAgentLoop(AgentLoopBase):
             )
 
         agent_data.assistant_turns += 1
-        agent_data.response_ids += output.token_ids
-        agent_data.prompt_ids += output.token_ids
-        agent_data.response_mask += [1] * len(output.token_ids)
-        if output.log_probs:
-            agent_data.response_logprobs += output.log_probs
-        if getattr(output, "routed_experts", None) is not None:
-            agent_data.routed_experts = output.routed_experts  # last request wins
+        self._append_generation_output(agent_data, output)
 
         # Decode only newly generated tokens for this round
         cur_response = await self.loop.run_in_executor(
@@ -1257,13 +1232,7 @@ class DeepResearchAgentLoop(AgentLoopBase):
             )
 
         agent_data.assistant_turns += 1
-        agent_data.response_ids += output.token_ids
-        agent_data.prompt_ids += output.token_ids
-        agent_data.response_mask += [1] * len(output.token_ids)
-        if output.log_probs:
-            agent_data.response_logprobs += output.log_probs
-        if getattr(output, "routed_experts", None) is not None:
-            agent_data.routed_experts = output.routed_experts  # last request wins
+        self._append_generation_output(agent_data, output)
 
         cur_response = await self.loop.run_in_executor(
             None, lambda: self.tokenizer.decode(output.token_ids, skip_special_tokens=True)
@@ -1474,13 +1443,28 @@ class DeepResearchAgentLoop(AgentLoopBase):
             keep.pop(0)
         return keep
 
-    def _rotate_session(self, agent_data: "AgentData", question: str, stream_filepath: str,
+    async def _rotate_session(self, agent_data: "AgentData", question: str, stream_filepath: str,
                         trigger_reason: str, new_state: Optional[Dict],
-                        pending_messages: Optional[List[Dict[str, Any]]], stream: bool = True) -> None:
+                        pending_messages: Optional[List[Dict[str, Any]]], stream: bool = True,
+                        pending_prompt_ids: Optional[List[int]] = None) -> bool:
         """Archive the current session, advance the counters and clear the response
         buffer; the next session starts from pending_messages. Same as the
         condenser branch, except a non-empty pending_messages carries the
         compacted context into the new session."""
+        session_messages = pending_messages
+        if session_messages is None:
+            session_messages = self._session_messages(agent_data, new_state)
+        prompt_ids = pending_prompt_ids
+        if prompt_ids is None:
+            prompt_ids = await self._tokenize_session_messages(session_messages)
+        if len(prompt_ids) > self.prompt_length:
+            agent_data.metrics["session_prompt_overflow"] = agent_data.metrics.get("session_prompt_overflow", 0) + 1
+            logger.warning(
+                "Ending trajectory before memory rollover: next session prompt has %d tokens, limit %d; "
+                "preserving the current session without truncating the question or state.",
+                len(prompt_ids), self.prompt_length,
+            )
+            return False
         if stream:
             self._stream_trajectory(agent_data, question, is_final=False,
                                     trigger_reason=trigger_reason, stream_filepath=stream_filepath)
@@ -1501,12 +1485,15 @@ class DeepResearchAgentLoop(AgentLoopBase):
 
         agent_data.memory_state = new_state
         agent_data.session_id += 1
-        agent_data.pending_messages = pending_messages
+        agent_data.pending_messages = session_messages
+        agent_data.pending_prompt_ids = list(prompt_ids)
+        agent_data.request_id = uuid4().hex
         agent_data.response_ids = []
         agent_data.response_mask = []
         agent_data.response_logprobs = []
         agent_data.routed_experts = None
         agent_data.session_response = ""
+        return True
 
     async def _handle_memory_trigger_state(self, agent_data: AgentData, question: str = "", stream_filepath: str = "") -> AgentState:
         """Handle a memory trigger: try tier 1 (deterministic trimming) first and
@@ -1514,18 +1501,19 @@ class DeepResearchAgentLoop(AgentLoopBase):
         if self.memory_tier1_enabled:
             compacted, st = self._tier1_compact(agent_data.messages)
             target = self.memory_tier1_target or max(1, (self.context_threshold * 3) // 5)
-            after = self._tier1_tokens(compacted) if st["chars_saved"] else None
+            candidate_ids = await self._tokenize_session_messages(compacted) if st["chars_saved"] else None
+            after = len(candidate_ids) if candidate_ids is not None else None
             if after is not None and after <= target:
                 logger.info(
                     "[Memory] tier1 freed %d chars (%d tool outputs stubbed, %d think blocks stripped); "
                     "context %d -> %d tokens <= target %d, rotating session without condenser",
                     st["chars_saved"], st["stubbed"], st["think_stripped"], self.context_threshold, after, target)
                 agent_data.metrics["memory_tier1_rotations"] = agent_data.metrics.get("memory_tier1_rotations", 0) + 1
-                self._rotate_session(agent_data, question, stream_filepath,
+                accepted = await self._rotate_session(agent_data, question, stream_filepath,
                                      trigger_reason="CONTEXT_THRESHOLD_TIER1",
                                      new_state=agent_data.memory_state,
-                                     pending_messages=compacted)
-                return AgentState.PENDING
+                                     pending_messages=compacted, pending_prompt_ids=candidate_ids)
+                return AgentState.PENDING if accepted else AgentState.TERMINATED
             logger.info(
                 "[Memory] tier1 relief insufficient (freed %d chars, context still %s vs target %d); escalating to condenser",
                 st["chars_saved"], after, target)
@@ -1584,9 +1572,11 @@ class DeepResearchAgentLoop(AgentLoopBase):
                 stream_filepath=stream_filepath,
             )
             n_resp = len(agent_data.response_ids)
-            self._rotate_session(agent_data, question, stream_filepath,
+            accepted = await self._rotate_session(agent_data, question, stream_filepath,
                                  trigger_reason=trigger_reason, new_state=new_state,
                                  pending_messages=pending, stream=False)
+            if not accepted:
+                return AgentState.TERMINATED
             logger.info(f"[Memory] Saved session {agent_data.session_id - 1} with {n_resp} response tokens")
             logger.info(f"[Memory] Starting new session {agent_data.session_id}")
             return AgentState.PENDING

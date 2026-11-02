@@ -1,5 +1,3 @@
-# Axion relocation: canonical package/resource paths; training behavior unchanged.
+# Axion: use the base agent with the backend's current abort/resume client.
 - name: deepresearch_agent
   _target_: axion.training.rl.agent_loop.deepresearch_agent_loop.DeepResearchAgentLoop
-- name: deepresearch_async_partial_agent
-  _target_: axion.training.rl.agent_loop.deepresearch_async_partial_agent_loop.DeepResearchAsyncPartialAgentLoop

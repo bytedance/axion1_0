@@ -1,0 +1,47 @@
+{
+  "recipe": "Qwen3.5-122B-A10B Stage II to paper-based RL",
+  "paper": {
+    "title": "Axion 1.0: Open Agent Foundation Models, Simplified",
+    "sections": [
+      "3.3",
+      "5.2",
+      "Appendix A Table 5"
+    ],
+    "sha256": "3dd66894874485efe2811130772729f9157e6ebb3b2dd11320b57ef0b38459c4"
+  },
+  "backend": {
+    "source": "data/open_verl",
+    "branch": "quest-deepresearch-port",
+    "revision": "b1f05f92ad76e70e5684747d97d0dc6b7920834f"
+  },
+  "reward_source": {
+    "source": "Axion/sciteacher code/rl/process_reward.py",
+    "sha256": "db3207b4c6ed437ed08be5a6ddf49d5ae4d9ddbd6e979f0710bd3788a84c1b68",
+    "adaptations": [
+      "Paper Eq4/Eq5",
+      "Submitted final-answer extraction",
+      "Explicit targets and numeric tolerances",
+      "Tool-grounded intermediate evidence",
+      "Failed evaluations excluded"
+    ]
+  },
+  "runtime": {
+    "historical_final_environment_recovered": false,
+    "distributed_gpu_validated": false,
+    "lm_head_ce_fusion_enabled": false
+  },
+  "required_deployment_inputs": [
+    "total optimizer updates",
+    "context condensation threshold",
+    "agent turn and tool/response limits",
+    "service endpoints and credentials"
+  ],
+  "implementation_choices": {
+    "context_parallel_size": 1,
+    "fresh_start_only": true,
+    "attempt_budget_default": "updates * 24 * 100",
+    "microbatch_size": 1,
+    "dynamic_microbatching": false,
+    "pad_bshd_to_minibatch_max": false
+  }
+}

@@ -19,8 +19,13 @@ Files changed from their upstream versions carry a change notice in the file,
 as required by Apache-2.0 Section 4(b):
 
 - Modified DeepResearch files under `axion/training/rl/`
-- The fully asynchronous trainer Hydra search path in `third_party/verl/verl/experimental/fully_async_policy/config/fully_async_ppo_megatron_trainer.yaml`
+- The fully asynchronous trainer configuration, rollout/trainer group handling,
+  optional validation, routing capture/replay and Megatron padding adapters in
+  `third_party/verl/`; Axion-specific training hooks are enabled by the paper recipe
 - Swift publication and training-runtime adaptations listed in `third_party/swift/SOURCE.json`
+
+The paper reward implementation also adapts Axion/sciteacher verification logic;
+its source fingerprint is recorded in `axion/training/rl/provenance.json`.
 
 The files under `axion/evaluation/hipho/official_impl/` are unmodified; `shim.py` in that
 directory is this project's own code and adapts to them.

@@ -1,3 +1,4 @@
+# Modified by the Axion authors: allow disabled validation and preserve real-session loss normalization.
 # Copyright 2024 Bytedance Ltd. and/or its affiliates
 # Copyright 2023-2024 SGLang Team
 # Copyright 2025 ModelBest Inc. and/or its affiliates
@@ -444,7 +445,12 @@ class RayPPOTrainer:
                 self.processor,
                 max_samples=self.config.data.get("train_max_samples", -1),
             )
-        if val_dataset is None:
+        load_validation = True
+        if self.config.get("async_training", {}).get("axion_recipe", False):
+            from axion.training.rl.async_batch import validation_dataset_required
+
+            load_validation = val_dataset is not None or validation_dataset_required(self.config)
+        if val_dataset is None and load_validation:
             val_dataset = create_rl_dataset(
                 self.config.data.val_files,
                 self.config.data,
@@ -472,26 +478,24 @@ class RayPPOTrainer:
             sampler=train_sampler,
         )
 
-        val_batch_size = self.config.data.val_batch_size  # Prefer config value if set
-        if val_batch_size is None:
-            val_batch_size = len(self.val_dataset)
-
-        self.val_dataloader = StatefulDataLoader(
-            dataset=self.val_dataset,
-            batch_size=val_batch_size,
-            num_workers=num_workers,
-            shuffle=self.config.data.get("validation_shuffle", True),
-            drop_last=False,
-            collate_fn=collate_fn,
-        )
+        self.val_dataloader = None
+        if load_validation:
+            val_batch_size = self.config.data.val_batch_size  # Prefer config value if set
+            if val_batch_size is None:
+                val_batch_size = len(self.val_dataset)
+            self.val_dataloader = StatefulDataLoader(
+                dataset=self.val_dataset,
+                batch_size=val_batch_size,
+                num_workers=num_workers,
+                shuffle=self.config.data.get("validation_shuffle", True),
+                drop_last=False,
+                collate_fn=collate_fn,
+            )
+            assert len(self.val_dataloader) >= 1, "Validation dataloader is empty!"
 
         assert len(self.train_dataloader) >= 1, "Train dataloader is empty!"
-        assert len(self.val_dataloader) >= 1, "Validation dataloader is empty!"
-
-        print(
-            f"Size of train dataloader: {len(self.train_dataloader)}, Size of val dataloader: "
-            f"{len(self.val_dataloader)}"
-        )
+        val_size = len(self.val_dataloader) if self.val_dataloader is not None else 0
+        print(f"Size of train dataloader: {len(self.train_dataloader)}, Size of val dataloader: {val_size}")
 
         total_training_steps = len(self.train_dataloader) * self.config.trainer.total_epochs
 
@@ -665,6 +669,8 @@ class RayPPOTrainer:
         return batch_reward
 
     def _validate(self, merged: bool = False):
+        if self.val_dataloader is None:
+            raise ValueError("Cannot run validation without a configured validation dataset")
         data_source_lst = []
         reward_extra_infos_dict: dict[str, list] = defaultdict(list)
 
@@ -1391,6 +1397,14 @@ class RayPPOTrainer:
         ppo_mini_batch_size = self.config.actor_rollout_ref.actor.ppo_mini_batch_size
         ppo_mini_batch_size = ppo_mini_batch_size * self.config.actor_rollout_ref.rollout.n
         ppo_epochs = self.config.actor_rollout_ref.actor.ppo_epochs
+        global_batch_size = ppo_mini_batch_size
+        if self.config.get("async_training", {}).get("axion_recipe", False):
+            from axion.training.rl.async_batch import actor_batch_parameters
+
+            parameters = actor_batch_parameters(len(batch), batch.meta_info["axion_real_sessions"])
+            ppo_mini_batch_size = parameters["mini_batch_size"]
+            global_batch_size = parameters["global_batch_size"]
+            ppo_epochs = parameters["epochs"]
         seed = self.config.actor_rollout_ref.actor.data_loader_seed
         shuffle = self.config.actor_rollout_ref.actor.shuffle
         tu.assign_non_tensor(
@@ -1398,7 +1412,7 @@ class RayPPOTrainer:
             calculate_entropy=calculate_entropy,
             distillation_use_topk=distillation_use_topk,
             distillation_only=distillation_only,
-            global_batch_size=ppo_mini_batch_size,
+            global_batch_size=global_batch_size,
             mini_batch_size=ppo_mini_batch_size,
             epochs=ppo_epochs,
             seed=seed,

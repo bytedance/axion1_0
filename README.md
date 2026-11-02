@@ -40,7 +40,8 @@
   feedback from the base model. Tasks requiring tools are constructed from
   public data sources with programmatically determined reference answers.
 - **Open training code.** The repository includes data generation and
-  filtering, prompts, a two-stage SFT recipe, RL source, and benchmark preparation and grading.
+  filtering, prompts, two-stage SFT, asynchronous RL, and benchmark preparation
+  and grading.
 
 ## Results
 
@@ -164,9 +165,10 @@ third_party/
 tests/           Regression and packaging checks
 ```
 
-The released SFT guide contains one 122B recipe. RL source is included;
-the complete runtime and launch configuration for the paper's final RL runs
-have not been recovered.
+The training guides provide one 122B pipeline: two-stage SFT followed by
+paper-based asynchronous GRPO. The RL implementation includes session training,
+TITO and R3; its distributed GPU execution and benchmark reproduction remain
+unverified.
 
 For data construction and evaluation, use a separate Python 3.11+ environment:
 
@@ -181,7 +183,7 @@ python -m pip install -e ".[data,evaluation]"
 | [Stage I data](axion/datagen/stage1/README.md) | Problem generation, rewriting, answer verification, and trajectory filtering |
 | [Stage II data](axion/datagen/stage2/README.md) | Database generators, question filtering, scoring, and trajectory processing |
 | [SFT](axion/training/sft/README.md) | Runtime setup, data requirements, two-stage training, and checkpoint export |
-| [RL](axion/training/rl/README.md) | Framework source, agent tools, and reproduction status |
+| [RL](axion/training/rl/README.md) | Paper recipe, task selection, services, and launch |
 | [Evaluation](axion/evaluation/README.md) | Dataset preparation and grading for FrontierScience, HiPhO, HLE-130, and SEAL-0 |
 
 Evaluation scripts prepare datasets and grade rollouts collected with an

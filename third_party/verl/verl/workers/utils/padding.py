@@ -1,3 +1,4 @@
+# Modified by the Axion authors: preserve routing coverage and time-axis alignment during compaction.
 # Copyright 2025 Bytedance Ltd. and/or its affiliates
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -79,6 +80,14 @@ def left_right_2_no_padding(data: TensorDict) -> TensorDict:
             routed_experts_rmpad.squeeze(-1), offsets=cu_seqlens
         )
         data["routed_experts"] = routed_experts_nested
+
+    # Modified by Axion: coverage follows the same token indices as expert routes.
+    route_mask = data.get("routed_experts_mask", None)
+    if route_mask is not None and not route_mask.is_nested:
+        mask_values = index_first_axis(route_mask.reshape(-1, 1), indices).squeeze(-1)
+        data["routed_experts_mask"] = torch.nested.nested_tensor_from_jagged(
+            mask_values.to(torch.bool), offsets=cu_seqlens
+        )
 
     # (bsz, seqlen, topk)
     teacher_logprobs = data.get("teacher_logprobs", None)
@@ -281,7 +290,10 @@ def compact_left_right_padding(data):
     for key in _RESPONSE_ONLY_KEYS:
         if key in data.batch and data.batch[key].shape[-1] == response_len:
             data.batch[key] = data.batch[key][..., :max_response_len]
-    for key in ("input_ids", "attention_mask", "position_ids", "routed_experts", "teacher_ids", "teacher_logprobs"):
+    for key in ("routed_experts", "teacher_ids", "teacher_logprobs"):
+        if key in data.batch and data.batch[key].shape[1] == prompt_len + response_len:
+            data.batch[key] = data.batch[key][:, prompt_len - max_prompt_len:prompt_len + max_response_len]
+    for key in ("input_ids", "attention_mask", "position_ids", "routed_experts_mask"):
         if key in data.batch and data.batch[key].shape[-1] == prompt_len + response_len:
             data.batch[key] = _slice_full_sequence(data.batch[key], prompt_len, max_prompt_len, max_response_len)
     return data

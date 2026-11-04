@@ -73,9 +73,14 @@ scores are from official reports. — denotes an unreported result.
 Both models in the paper use SFT and RL. The paper also reports 4B and 9B
 variants trained with SFT only.
 
+We encourage users to try the
+[Axion 1.0-35B community reproduction](https://huggingface.co/Axion1-0/Axion-1.0-35B),
+announced in [issue #1](https://github.com/bytedance/axion1_0/issues/1).
+This is a community release, not an official Axion checkpoint.
+See the model card for reproduction results and inference instructions.
+
 Training data is available on
 [Hugging Face](https://huggingface.co/datasets/Axion1-0/axion-training-data).
-The [Axion 1.0-35B reproduction checkpoint](https://huggingface.co/Axion1-0/Axion-1.0-35B) is available on Hugging Face. See its model card for reproduction results and inference instructions.
 
 ## 3. Training Recipe
 

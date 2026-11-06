@@ -200,12 +200,11 @@ external agent harness. The evaluation guide documents the required format.
 ## 6. Citation
 
 ```bibtex
-@techreport{jia2026axion,
-  title  = {Axion 1.0: Open Agent Foundation Models, Simplified},
-  author = {Jia, Yuqi and Tian, Yunjie and Zheng, Jiayu and Liang, Yijun
-            and Sun, Jingchen and Zhao, Mengyu and Fu, Di},
-  year   = {2026},
-  url    = {https://axion1-0.github.io/paper/axion.pdf}
+@article{jia2026axion,
+  title={Axion 1.0: Open Agent Foundation Models, Simplified},
+  author={Jia, Yuqi and Tian, Yunjie and Zheng, Jiayu and Liang, Yijun and Sun, Jingchen and Zhao, Mengyu and Fu, Di},
+  journal={arXiv preprint arXiv:2611.03233},
+  year={2026}
 }
 ```
 

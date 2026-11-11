@@ -57,7 +57,7 @@ Selected results from Table 1 of the
 | Gemini 3.1 Pro | 51.4 | 35.3* | 53.2* | 38.5* | 85.0* | 26.7* |
 | Claude Fable 5 | 63.8 | 46.1 | — | — | — | — |
 | **Axion 1.0-35B** | **52.2** | **35.3** | **62.2** | **45.7** | **86.0** | **56.7** |
-| **Axion 1.0-122B** | **59.0** | **41.7** | **58.6** | **46.2** | **87.0** | **66.7** |
+| **Axion 1.0-122B** | **59.0** | **41.2** | **58.6** | **46.2** | **87.0** | **66.7** |
 
 BMB denotes the human-difficult subset of BioMysteryBench; FS denotes
 FrontierScience. * marks baselines evaluated by the Axion team; other baseline
